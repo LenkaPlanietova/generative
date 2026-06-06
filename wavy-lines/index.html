@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wavy Lines</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #000; overflow: hidden; }
+  canvas { display: block; cursor: none; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H, time = 0;
+const mouse = { x: -999, y: -999 };
+
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+window.addEventListener('mousemove', e => {
+  mouse.x = e.clientX;
+  mouse.y = e.clientY;
+});
+window.addEventListener('mouseleave', () => {
+  mouse.x = -999;
+  mouse.y = -999;
+});
+
+function draw() {
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, W, H);
+
+  const numLines = 28;
+  const spacing = H / (numLines + 1);
+  const radius = 130;
+  const strength = 60;
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+  ctx.lineWidth = 1.5;
+  ctx.lineCap = 'round';
+
+  for (let i = 0; i < numLines; i++) {
+    const baseY = spacing * (i + 1);
+    const steps = 220;
+    ctx.beginPath();
+
+    for (let j = 0; j <= steps; j++) {
+      const x = (j / steps) * W;
+      const noiseOffset =
+        Math.sin(j * 0.045 + time * 0.6 + i * 0.4) * 12 +
+        Math.sin(j * 0.02 + time * 0.3 + i * 0.7) * 18;
+
+      let dy = 0;
+      if (mouse.x >= 0) {
+        const dx = x - mouse.x;
+        const distY = baseY - mouse.y;
+        const dist = Math.sqrt(dx * dx + distY * distY);
+        if (dist < radius) {
+          const falloff = 1 - dist / radius;
+          const angle = Math.atan2(distY, dx);
+          dy = Math.sin(angle) * strength * falloff * falloff;
+        }
+      }
+
+      const y = baseY + noiseOffset + dy;
+      j === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+
+  if (mouse.x >= 0) {
+    ctx.beginPath();
+    ctx.arc(mouse.x, mouse.y, radius, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(mouse.x, mouse.y, 4, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.fill();
+  }
+
+  time += 0.016;
+  requestAnimationFrame(draw);
+}
+
+draw();
+</script>
+</body>
+</html>
