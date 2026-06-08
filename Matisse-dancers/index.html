@@ -1,1 +1,223 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Matisse Dancers</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        background: #1a5276;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        overflow: hidden;
+      }
+      canvas {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+    <script>
+      const BLUE = [28, 83, 142];
+      const GREEN = [26, 111, 80];
+      const SALMON = [240, 158, 130];
+      const DARK = [30, 20, 18];
+      const OUTLINE = [40, 90, 70];
 
+      let dancers = [];
+      let t = 0;
+
+      function setup() {
+        createCanvas(windowWidth, windowHeight);
+        colorMode(RGB);
+        noFill();
+        initDancers();
+      }
+
+      function initDancers() {
+        dancers = [];
+        let count = 5;
+        for (let i = 0; i < count; i++) {
+          let angle = (TWO_PI / count) * i - HALF_PI;
+          dancers.push({
+            baseAngle: angle,
+            phase: random(TWO_PI),
+            speed: random(0.003, 0.007),
+            scale: random(0.85, 1.15),
+          });
+        }
+      }
+
+      function draw() {
+        t += 0.008;
+        background(...BLUE);
+        let cx = width / 2;
+        let cy = height / 2;
+        let radius = min(width, height) * 0.28;
+        drawHill();
+        for (let i = 0; i < dancers.length; i++) {
+          let d = dancers[i];
+          let a = d.baseAngle + sin(t * 0.4 + d.phase) * 0.18;
+          let x = cx + cos(a) * radius;
+          let y = cy + sin(a) * radius * 0.55 + height * 0.08;
+          let sway = sin(t + d.phase) * 0.12;
+          drawFigure(x, y, d.scale, sway, a);
+        }
+        drawHandLinks(cx, cy, radius);
+      }
+
+      function drawHill() {
+        fill(...GREEN);
+        noStroke();
+        beginShape();
+        vertex(0, height);
+        for (let x = 0; x <= width; x += 20) {
+          let n = noise(x * 0.003, t * 0.2);
+          let y = height * 0.68 + n * height * 0.08;
+          vertex(x, y);
+        }
+        vertex(width, height);
+        endShape(CLOSE);
+      }
+
+      function drawFigure(cx, cy, sc, sway, facing) {
+        push();
+        translate(cx, cy);
+        rotate(sway);
+        scale(sc * min(width, height) * 0.001);
+        strokeWeight(3.5);
+        stroke(...OUTLINE);
+        fill(...SALMON);
+
+        // Torso
+        beginShape();
+        curveVertex(-18, -30);
+        curveVertex(-15, -60);
+        curveVertex(0, -75);
+        curveVertex(15, -60);
+        curveVertex(18, -30);
+        curveVertex(10, 20);
+        curveVertex(-10, 20);
+        curveVertex(-18, -30);
+        endShape(CLOSE);
+
+        // Hips
+        beginShape();
+        curveVertex(-22, 18);
+        curveVertex(-18, 10);
+        curveVertex(0, 8);
+        curveVertex(18, 10);
+        curveVertex(22, 18);
+        curveVertex(14, 35);
+        curveVertex(-14, 35);
+        curveVertex(-22, 18);
+        endShape(CLOSE);
+
+        // Left leg
+        beginShape();
+        curveVertex(-14, 32);
+        curveVertex(-18, 55);
+        curveVertex(-20 + sin(sway * 4) * 8, 90);
+        curveVertex(-14, 120);
+        curveVertex(-8, 120);
+        curveVertex(-10, 90);
+        curveVertex(-8, 55);
+        curveVertex(-6, 32);
+        endShape(CLOSE);
+
+        // Right leg
+        beginShape();
+        curveVertex(6, 32);
+        curveVertex(8, 55);
+        curveVertex(16 + sin(sway * 3) * 10, 90);
+        curveVertex(14, 120);
+        curveVertex(20, 120);
+        curveVertex(24, 90);
+        curveVertex(20, 55);
+        curveVertex(14, 32);
+        endShape(CLOSE);
+
+        // Left arm
+        beginShape();
+        curveVertex(-15, -55);
+        curveVertex(-30, -65);
+        curveVertex(-55 + sin(sway * 2) * 12, -80);
+        curveVertex(-70, -75);
+        curveVertex(-65, -68);
+        curveVertex(-50, -72);
+        curveVertex(-28, -58);
+        curveVertex(-10, -48);
+        endShape(CLOSE);
+
+        // Right arm
+        beginShape();
+        curveVertex(15, -55);
+        curveVertex(30, -65);
+        curveVertex(55 + sin(sway * 2) * 12, -78);
+        curveVertex(70, -72);
+        curveVertex(65, -65);
+        curveVertex(50, -70);
+        curveVertex(28, -58);
+        curveVertex(10, -48);
+        endShape(CLOSE);
+
+        // Head
+        fill(...SALMON);
+        ellipse(0, -88, 28, 32);
+
+        // Hair
+        fill(...DARK);
+        noStroke();
+        beginShape();
+        curveVertex(-8, -100);
+        curveVertex(-14, -95);
+        curveVertex(-10, -76);
+        curveVertex(0, -72);
+        curveVertex(10, -76);
+        curveVertex(14, -95);
+        curveVertex(8, -100);
+        curveVertex(0, -108);
+        endShape(CLOSE);
+
+        pop();
+      }
+
+      function drawHandLinks(cx, cy, radius) {
+        stroke(...SALMON, 80);
+        strokeWeight(2);
+        noFill();
+        let count = dancers.length;
+        for (let i = 0; i < count; i++) {
+          let d1 = dancers[i];
+          let d2 = dancers[(i + 1) % count];
+          let a1 = d1.baseAngle + sin(t * 0.4 + d1.phase) * 0.18;
+          let a2 = d2.baseAngle + sin(t * 0.4 + d2.phase) * 0.18;
+          let x1 = cx + cos(a1) * radius;
+          let y1 = cy + sin(a1) * radius * 0.55 + height * 0.08;
+          let x2 = cx + cos(a2) * radius;
+          let y2 = cy + sin(a2) * radius * 0.55 + height * 0.08;
+          let mx = (x1 + x2) / 2;
+          let my = (y1 + y2) / 2 - 40;
+          beginShape();
+          curveVertex(x1, y1 - min(width, height) * 0.065);
+          curveVertex(x1, y1 - min(width, height) * 0.065);
+          curveVertex(mx, my);
+          curveVertex(x2, y2 - min(width, height) * 0.065);
+          curveVertex(x2, y2 - min(width, height) * 0.065);
+          endShape();
+        }
+      }
+
+      function windowResized() {
+        resizeCanvas(windowWidth, windowHeight);
+      }
+    </script>
+  </body>
+</html>
