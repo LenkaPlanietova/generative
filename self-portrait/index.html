@@ -33,11 +33,23 @@
         letter-spacing: 0.08em;
         text-transform: uppercase;
       }
+      .label {
+        position: fixed;
+        left: 20px;
+        bottom: 20px;
+        color: white;
+        opacity: 0.4;
+        font: 13px/1.4 system-ui, sans-serif;
+        letter-spacing: 0.06em;
+        pointer-events: none;
+      }
     </style>
   </head>
   <body>
     <div id="loading">Drawing contours…</div>
     <canvas id="c"></canvas>
+    <div class="label">Move mouse to cast light · Press S to save</div>
+
     <script>
       const canvas = document.getElementById("c");
       const ctx = canvas.getContext("2d");
@@ -48,9 +60,6 @@
       const MAX_BRIGHT = 0.93;
       const GRID_STEP = 2;
 
-      const img = new Image();
-      img.src = "portrait.png";
-
       // marching squares edge pairs: 0=top, 1=right, 2=bottom, 3=left
       const LINES = [
         [],
@@ -58,18 +67,12 @@
         [[0, 1]],
         [[3, 1]],
         [[1, 2]],
-        [
-          [3, 0],
-          [1, 2],
-        ],
+        [[3, 0], [1, 2]],
         [[0, 2]],
         [[3, 2]],
         [[2, 3]],
         [[2, 0]],
-        [
-          [0, 1],
-          [2, 3],
-        ],
+        [[0, 1], [2, 3]],
         [[2, 1]],
         [[1, 3]],
         [[1, 0]],
@@ -77,9 +80,7 @@
         [],
       ];
 
-      function lerp(a, b, t) {
-        return a + (b - a) * t;
-      }
+      function lerp(a, b, t) { return a + (b - a) * t; }
 
       function interp(x1, y1, v1, x2, y2, v2, threshold) {
         const d = v2 - v1;
@@ -94,7 +95,6 @@
       function contourSegments(grid, w, h, threshold) {
         const verts = [];
         const segs = [];
-
         for (let y = 0; y < h - 1; y++) {
           for (let x = 0; x < w - 1; x++) {
             const tl = sample(grid, w, h, x, y);
@@ -132,74 +132,240 @@
         const gridW = Math.ceil(w / GRID_STEP);
         const gridH = Math.ceil(h / GRID_STEP);
         const grid = new Float32Array(gridW * gridH);
-
         for (let gy = 0; gy < gridH; gy++) {
           for (let gx = 0; gx < gridW; gx++) {
             const sx = Math.min(gx * GRID_STEP, w - 1);
             const sy = Math.min(gy * GRID_STEP, h - 1);
             const i = (sy * w + sx) * 4;
-            const r = src[i];
-            const g = src[i + 1];
-            const b = src[i + 2];
-            grid[gy * gridW + gx] = (r * 0.299 + g * 0.587 + b * 0.114) / 255;
+            grid[gy * gridW + gx] =
+              (src[i] * 0.299 + src[i + 1] * 0.587 + src[i + 2] * 0.114) / 255;
           }
         }
         return { grid, gridW, gridH };
       }
 
-      function layout() {
+      // --- state ---
+      let allSegments = null;
+      let canvasW, canvasH;
+      let startTime = null;
+      let mouseX = -9999;
+      let mouseY = -9999;
+
+      const img = new Image();
+      img.src = "portrait.png";
+
+      function precompute() {
         const maxW = window.innerWidth * 0.92;
         const maxH = window.innerHeight * 0.92;
         const scale = Math.min(maxW / img.width, maxH / img.height);
-        const w = Math.round(img.width * scale);
-        const h = Math.round(img.height * scale);
-        canvas.width = w;
-        canvas.height = h;
-        return { w, h };
-      }
-
-      function draw() {
-        const { w, h } = layout();
+        canvasW = Math.round(img.width * scale);
+        canvasH = Math.round(img.height * scale);
+        canvas.width = canvasW;
+        canvas.height = canvasH;
 
         const off = document.createElement("canvas");
-        off.width = w;
-        off.height = h;
+        off.width = canvasW;
+        off.height = canvasH;
         const offCtx = off.getContext("2d");
-        offCtx.drawImage(img, 0, 0, w, h);
-        const { grid, gridW, gridH } = buildGrid(offCtx.getImageData(0, 0, w, h), w, h);
+        offCtx.drawImage(img, 0, 0, canvasW, canvasH);
+        const { grid, gridW, gridH } = buildGrid(
+          offCtx.getImageData(0, 0, canvasW, canvasH),
+          canvasW,
+          canvasH
+        );
+
+        allSegments = [];
+        for (let i = 0; i < LEVELS; i++) {
+          const t = i / (LEVELS - 1);
+          const threshold = MIN_BRIGHT + t * (MAX_BRIGHT - MIN_BRIGHT);
+          allSegments.push(contourSegments(grid, gridW, gridH, threshold));
+        }
+      }
+
+      // Ripple distortion: push contour points outward from mouse like a wave
+      function distortPoint(x, y, elapsed) {
+        if (mouseX <= -999) return [x, y];
+        const dx = x - mouseX;
+        const dy = y - mouseY;
+        const d2 = dx * dx + dy * dy;
+        const R = 220;
+        if (d2 >= R * R || d2 === 0) return [x, y];
+        const d = Math.sqrt(d2);
+        const wave = Math.sin(elapsed * 3.8 - d * 0.065) * (1 - d / R) * 18;
+        return [x + (dx / d) * wave, y + (dy / d) * wave];
+      }
+
+      function drawFlare(elapsed) {
+        if (mouseX <= -999) return;
+        ctx.globalCompositeOperation = "screen";
+
+        // Outer ambient glow
+        const outer = ctx.createRadialGradient(mouseX, mouseY, 0, mouseX, mouseY, 230);
+        outer.addColorStop(0,   "rgba(100, 180, 255, 0.20)");
+        outer.addColorStop(0.4, "rgba( 80, 150, 255, 0.07)");
+        outer.addColorStop(1,   "rgba( 80, 150, 255, 0)");
+        ctx.fillStyle = outer;
+        ctx.fillRect(0, 0, canvasW, canvasH);
+
+        // Bright inner core
+        const core = ctx.createRadialGradient(mouseX, mouseY, 0, mouseX, mouseY, 48);
+        core.addColorStop(0,   "rgba(220, 240, 255, 0.95)");
+        core.addColorStop(0.25,"rgba(140, 200, 255, 0.40)");
+        core.addColorStop(1,   "rgba( 80, 160, 255, 0)");
+        ctx.fillStyle = core;
+        ctx.fillRect(0, 0, canvasW, canvasH);
+
+        // Star streaks — 4 spokes, lengths breathe slightly
+        ctx.save();
+        ctx.translate(mouseX, mouseY);
+        for (let s = 0; s < 4; s++) {
+          const angle = (s / 4) * Math.PI;
+          const len = 110 + 18 * Math.sin(elapsed * 0.9 + s * 1.4);
+          const g = ctx.createLinearGradient(
+            -Math.cos(angle) * len, -Math.sin(angle) * len,
+             Math.cos(angle) * len,  Math.sin(angle) * len
+          );
+          g.addColorStop(0,    "rgba(160, 210, 255, 0)");
+          g.addColorStop(0.44, "rgba(160, 210, 255, 0.25)");
+          g.addColorStop(0.5,  "rgba(220, 240, 255, 0.60)");
+          g.addColorStop(0.56, "rgba(160, 210, 255, 0.25)");
+          g.addColorStop(1,    "rgba(160, 210, 255, 0)");
+          ctx.strokeStyle = g;
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          ctx.moveTo(-Math.cos(angle) * len, -Math.sin(angle) * len);
+          ctx.lineTo( Math.cos(angle) * len,  Math.sin(angle) * len);
+          ctx.stroke();
+        }
+        ctx.restore();
+
+        // Thin pulsing halo ring
+        const ringA = 0.14 + 0.06 * Math.sin(elapsed * 1.8);
+        ctx.strokeStyle = `rgba(120, 190, 255, ${ringA})`;
+        ctx.lineWidth = 0.6;
+        ctx.beginPath();
+        ctx.arc(mouseX, mouseY, 78 + 4 * Math.sin(elapsed * 1.3), 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Secondary orbs scattered along the axis from mouse → canvas center
+        const cx = canvasW * 0.5;
+        const cy = canvasH * 0.5;
+        const orbs = [
+          { f: -0.35, r: 18, a: 0.13 },
+          { f:  0.55, r: 11, a: 0.20 },
+          { f:  1.25, r: 16, a: 0.11 },
+          { f:  1.75, r:  7, a: 0.15 },
+        ];
+        for (const { f, r, a } of orbs) {
+          const gx = mouseX + (cx - mouseX) * f;
+          const gy = mouseY + (cy - mouseY) * f;
+          const orb = ctx.createRadialGradient(gx, gy, 0, gx, gy, r);
+          orb.addColorStop(0, `rgba(140, 200, 255, ${a})`);
+          orb.addColorStop(1, "rgba(140, 200, 255, 0)");
+          ctx.fillStyle = orb;
+          ctx.beginPath();
+          ctx.arc(gx, gy, r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        ctx.globalCompositeOperation = "source-over";
+      }
+
+      function animate(ts) {
+        if (!startTime) startTime = ts;
+        const elapsed = (ts - startTime) / 1000;
 
         ctx.fillStyle = "#0a0a0a";
-        ctx.fillRect(0, 0, w, h);
+        ctx.fillRect(0, 0, canvasW, canvasH);
 
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
 
         for (let i = 0; i < LEVELS; i++) {
           const t = i / (LEVELS - 1);
-          const threshold = MIN_BRIGHT + t * (MAX_BRIGHT - MIN_BRIGHT);
           const isMajor = i % 6 === 0;
-          const alpha = isMajor ? 0.55 : 0.28 + 0.22 * Math.sin(t * Math.PI);
-          ctx.strokeStyle = `rgba(235, 228, 218, ${alpha})`;
-          ctx.lineWidth = isMajor ? 0.9 : 0.45;
 
-          const segs = contourSegments(grid, gridW, gridH, threshold);
-          for (const [[x1, y1], [x2, y2]] of segs) {
+          // Breathing: slow pulse, each level slightly out of phase
+          const breathe = Math.sin(elapsed * 0.8 + i * 0.28);
+          const baseAlpha = isMajor ? 0.55 : 0.28 + 0.22 * Math.sin(t * Math.PI);
+          const alpha = Math.max(0.04, baseAlpha + breathe * 0.14);
+          const lineWidth = (isMajor ? 0.9 : 0.45) + breathe * 0.18;
+
+          ctx.strokeStyle = `rgba(235, 228, 218, ${alpha})`;
+          ctx.lineWidth = lineWidth;
+
+          for (const [[x1, y1], [x2, y2]] of allSegments[i]) {
+            const [dx1, dy1] = distortPoint(x1, y1, elapsed);
+            const [dx2, dy2] = distortPoint(x2, y2, elapsed);
+
+            // Per-segment warm boost near mouse
+            let proximity = 0;
+            if (mouseX > -999) {
+              const mx = (x1 + x2) * 0.5;
+              const my = (y1 + y2) * 0.5;
+              const d2 = (mx - mouseX) ** 2 + (my - mouseY) ** 2;
+              if (d2 < 180 * 180) proximity = 1 - Math.sqrt(d2) / 180;
+            }
+
+            if (proximity > 0) {
+              const r = Math.round(235 - proximity * 90);
+              const g = Math.round(228 - proximity * 20);
+              const b = Math.min(255, Math.round(218 + proximity * 37));
+              ctx.strokeStyle = `rgba(${r},${g},${b},${Math.min(1, alpha + proximity * 0.7)})`;
+              ctx.lineWidth = lineWidth + proximity * 3;
+            }
+
             ctx.beginPath();
-            ctx.moveTo(x1, y1);
-            ctx.lineTo(x2, y2);
+            ctx.moveTo(dx1, dy1);
+            ctx.lineTo(dx2, dy2);
             ctx.stroke();
+
+            if (proximity > 0) {
+              ctx.strokeStyle = `rgba(235,228,218,${alpha})`;
+              ctx.lineWidth = lineWidth;
+            }
           }
         }
 
-        loading.style.display = "none";
+        drawFlare(elapsed);
+
+        requestAnimationFrame(animate);
       }
 
-      img.onload = draw;
+      img.onload = () => {
+        precompute();
+        loading.style.display = "none";
+        requestAnimationFrame(animate);
+      };
+
       img.onerror = () => {
         loading.textContent = "Could not load portrait.png";
       };
+
+      canvas.addEventListener("mousemove", (e) => {
+        const rect = canvas.getBoundingClientRect();
+        mouseX = e.clientX - rect.left;
+        mouseY = e.clientY - rect.top;
+      });
+
+      canvas.addEventListener("mouseleave", () => {
+        mouseX = -9999;
+        mouseY = -9999;
+      });
+
+      window.addEventListener("keydown", (e) => {
+        if (e.key === "s" || e.key === "S") {
+          canvas.toBlob((blob) => {
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = "self-portrait.png";
+            a.click();
+          });
+        }
+      });
+
       window.addEventListener("resize", () => {
-        if (img.complete) draw();
+        if (img.complete && allSegments) precompute();
       });
     </script>
   </body>
