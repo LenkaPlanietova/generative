@@ -1,7 +1,7 @@
 # generative
 
 Personal collection of generative & interactive art experiments.  
-Built with p5.js, vanilla Canvas API, and whatever feels right.
+Built with p5.js, Three.js, vanilla Canvas API, Python, and whatever feels right.
 
 ---
 
@@ -15,14 +15,19 @@ Built with p5.js, vanilla Canvas API, and whatever feels right.
 | [interactive-web-sketch-01](./interactive-web-sketch-01/) | breathing grid of dots reacting to mouse and time | [↗ demo](https://lenkaplanietova.github.io/generative/interactive-web-sketch-01/) |
 | [self-portrait](./self-portrait/) | generative self-portrait experiment | [↗ demo](https://lenkaplanietova.github.io/generative/self-portrait/) |
 | [ester-3d](./ester-3d/) | interactive 3D candy-style name animation | [↗ demo](https://lenkaplanietova.github.io/generative/ester-3d/) |
-| [fibonacci-bloom](./fibonacci-bloom/) | generative Fibonacci spiral — Python, NumPy, Matplotlib | — |
+| [fibonacci-bloom](./fibonacci-bloom/) | interactive 3D Fibonacci spiral — golden ratio phyllotaxis, orbit camera | [↗ demo](https://lenkaplanietova.github.io/generative/fibonacci-bloom/) |
 
 ---
 
 ## run locally
 
-Each project is a standalone `index.html` — just open it in a browser.  
-Or use Live Server in VS Code / Cursor for auto-reload.
+Most projects are standalone `index.html` files — just open in a browser or use Live Server in VS Code / Cursor.
+
+The `fibonacci-bloom` experiment also includes a Python script:
+```bash
+cd fibonacci-bloom
+python3 bloom.py   # regenerates PNG, PDF and SVG outputs
+```
 
 ---
 
