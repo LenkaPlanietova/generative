@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ESTER</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        overflow: hidden;
+        background: linear-gradient(
+          120deg,
+          #ff5fad 0%,
+          #c84bec 50%,
+          #7b6cf6 100%
+        );
+      }
+
+      /* Three.js canvas sits behind everything */
+      canvas {
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+      }
+
+      /* Text layer */
+      #scene {
+        position: fixed;
+        inset: 0;
+        z-index: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        perspective: 900px;
+        pointer-events: none;
+      }
+
+      #title {
+        font-family: "Fredoka One", sans-serif;
+        font-size: clamp(120px, 28vw, 700px);
+        display: flex;
+        gap: 0.03em;
+        transform-style: preserve-3d;
+        will-change: transform;
+        filter: drop-shadow(0 14px 32px rgba(0, 0, 0, 0.3));
+      }
+
+      #title span {
+        display: inline-block;
+        animation: float 3.2s ease-in-out infinite;
+        line-height: 1;
+      }
+
+      /* Per-letter colours + layered text-shadow for the candy depth effect */
+      .l1 {
+        color: #ff5fa3;
+        text-shadow:
+          0 3px 0 #e0337a,
+          0 6px 0 #c01f60,
+          0 9px 0 rgba(180, 20, 70, 0.4),
+          0 14px 28px rgba(255, 80, 140, 0.55);
+        animation-delay: 0s;
+      }
+      .l2 {
+        color: #4dc8ff;
+        text-shadow:
+          0 3px 0 #1899d6,
+          0 6px 0 #0070aa,
+          0 9px 0 rgba(0, 90, 150, 0.4),
+          0 14px 28px rgba(50, 180, 255, 0.55);
+        animation-delay: 0.12s;
+      }
+      .l3 {
+        color: #ff8ec4;
+        text-shadow:
+          0 3px 0 #d95090,
+          0 6px 0 #be2070,
+          0 9px 0 rgba(160, 10, 80, 0.4),
+          0 14px 28px rgba(255, 120, 180, 0.55);
+        animation-delay: 0.24s;
+      }
+      .l4 {
+        color: #ffcc33;
+        text-shadow:
+          0 3px 0 #e0a000,
+          0 6px 0 #c07800,
+          0 9px 0 rgba(160, 90, 0, 0.4),
+          0 14px 28px rgba(255, 200, 50, 0.55);
+        animation-delay: 0.36s;
+      }
+      .l5 {
+        color: #c084fc;
+        text-shadow:
+          0 3px 0 #8b40d0,
+          0 6px 0 #6820aa,
+          0 9px 0 rgba(80, 10, 160, 0.4),
+          0 14px 28px rgba(180, 100, 255, 0.55);
+        animation-delay: 0.48s;
+      }
+
+      @keyframes float {
+        0%,
+        100% {
+          transform: translateY(0px);
+        }
+        50% {
+          transform: translateY(-18px);
+        }
+      }
+
+      #hint {
+        position: fixed;
+        bottom: 22px;
+        left: 50%;
+        transform: translateX(-50%);
+        color: rgba(255, 255, 255, 0.72);
+        font-family: system-ui, sans-serif;
+        font-size: 13px;
+        letter-spacing: 0.06em;
+        pointer-events: none;
+        white-space: nowrap;
+        text-shadow: 0 1px 6px rgba(0, 0, 0, 0.2);
+        z-index: 2;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="c"></canvas>
+
+    <div id="scene">
+      <div id="title">
+        <span class="l1">E</span>
+        <span class="l2">S</span>
+        <span class="l3">T</span>
+        <span class="l4">E</span>
+        <span class="l5">R</span>
+      </div>
+    </div>
+
+    <div id="hint">Move your mouse ✨</div>
+
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+      }
+    </script>
+
+    <script type="module">
+      import * as THREE from "three";
+
+      // ── Renderer (background decorations only) ────────────────────
+      const canvas = document.getElementById("c");
+      const renderer = new THREE.WebGLRenderer({
+        canvas,
+        antialias: true,
+        alpha: true,
+      });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(
+        55,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        100,
+      );
+      camera.position.set(0, 0, 10);
+
+      // ── Lights ───────────────────────────────────────────────────
+      scene.add(new THREE.AmbientLight(0xffffff, 2.5));
+      [
+        [0xff88cc, [6, 4, 5], 80],
+        [0x88ccff, [-6, 4, 5], 70],
+        [0xffee66, [0, -4, 6], 50],
+      ].forEach(([c, p, i]) => {
+        const l = new THREE.PointLight(c, i, 30);
+        l.position.set(...p);
+        scene.add(l);
+      });
+
+      // ── Decoration helpers ────────────────────────────────────────
+      const DECO = [
+        0xff5fa3, 0x4dc8ff, 0xff8ec4, 0xffcc33, 0xc084fc, 0xff9e44, 0x7de8a8,
+      ];
+      const floaters = [];
+      const rng = () => Math.random() - 0.5;
+
+      function addDeco(geo, x, y, z, color, transparent = false) {
+        const mat = new THREE.MeshPhysicalMaterial({
+          color,
+          roughness: transparent ? 0.0 : 0.2,
+          metalness: 0,
+          clearcoat: 1.0,
+          clearcoatRoughness: 0.05,
+          transparent,
+          opacity: transparent ? 0.22 : 1.0,
+          side: transparent ? THREE.DoubleSide : THREE.FrontSide,
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.set(x, y, z);
+        mesh.userData = {
+          baseY: y,
+          phase: Math.random() * Math.PI * 2,
+          rotVel: new THREE.Vector3(
+            rng() * 0.025,
+            rng() * 0.025,
+            rng() * 0.015,
+          ),
+          floatAmp: 0.2 + Math.random() * 0.4,
+          floatSpeed: 0.3 + Math.random() * 0.5,
+        };
+        scene.add(mesh);
+        floaters.push(mesh);
+      }
+
+      // Soap bubbles
+      for (let i = 0; i < 14; i++)
+        addDeco(
+          new THREE.SphereGeometry(0.18 + Math.random() * 0.42, 32, 32),
+          rng() * 14,
+          rng() * 6,
+          rng() * 3 - 2,
+          0xccf0ff,
+          true,
+        );
+
+      // Candy balls
+      for (let i = 0; i < 14; i++)
+        addDeco(
+          new THREE.SphereGeometry(0.1 + Math.random() * 0.28, 16, 16),
+          rng() * 15,
+          rng() * 7,
+          rng() * 4 - 2,
+          DECO[i % 7],
+        );
+
+      // Stars (squashed octahedrons)
+      for (let i = 0; i < 8; i++) {
+        const m = new THREE.Mesh(
+          new THREE.OctahedronGeometry(0.22 + Math.random() * 0.2, 0),
+          new THREE.MeshPhysicalMaterial({
+            color: [0xffdd44, 0xff99cc, 0x99ddff][i % 3],
+            roughness: 0.15,
+            clearcoat: 1.0,
+            clearcoatRoughness: 0.05,
+          }),
+        );
+        const x = rng() * 14,
+          y = rng() * 6,
+          z = rng() * 3 - 1;
+        m.position.set(x, y, z);
+        m.scale.y = 0.55;
+        m.userData = {
+          baseY: y,
+          phase: Math.random() * Math.PI * 2,
+          rotVel: new THREE.Vector3(0, rng() * 0.03, 0.01),
+          floatAmp: 0.2 + Math.random() * 0.3,
+          floatSpeed: 0.4 + Math.random() * 0.4,
+        };
+        scene.add(m);
+        floaters.push(m);
+      }
+
+      // Confetti discs
+      for (let i = 0; i < 22; i++)
+        addDeco(
+          new THREE.CylinderGeometry(
+            0.04 + Math.random() * 0.07,
+            0.04 + Math.random() * 0.07,
+            0.02,
+            8,
+          ),
+          rng() * 16,
+          rng() * 7,
+          rng() * 5 - 2,
+          DECO[i % 7],
+        );
+
+      // Rising bubbles
+      const rising = [];
+      for (let i = 0; i < 60; i++) {
+        const m = new THREE.Mesh(
+          new THREE.SphereGeometry(0.04 + Math.random() * 0.1, 8, 8),
+          new THREE.MeshPhysicalMaterial({
+            color: 0xffffff,
+            transparent: true,
+            opacity: 0.12 + Math.random() * 0.2,
+            roughness: 0,
+            clearcoat: 1.0,
+          }),
+        );
+        m.position.set(rng() * 20, -10 + Math.random() * 20, rng() * 4 - 3);
+        m.userData.speed = 0.007 + Math.random() * 0.013;
+        m.userData.drift = rng() * 0.004;
+        scene.add(m);
+        rising.push(m);
+      }
+
+      // ── Mouse → CSS 3D tilt on the text ─────────────────────────
+      const title = document.getElementById("title");
+      let tx = 0,
+        ty = 0;
+      window.addEventListener("mousemove", (e) => {
+        tx = -(e.clientY / window.innerHeight - 0.5) * 18;
+        ty = (e.clientX / window.innerWidth - 0.5) * 24;
+      });
+
+      // ── Animation ────────────────────────────────────────────────
+      let cx = 0,
+        cy = 0,
+        clock = 0;
+
+      function animate() {
+        requestAnimationFrame(animate);
+        clock += 0.016;
+
+        // Smooth tilt on the HTML text
+        cx += (tx - cx) * 0.06;
+        cy += (ty - cy) * 0.06;
+        title.style.transform = `rotateX(${cx}deg) rotateY(${cy}deg)`;
+
+        // 3D decorations
+        floaters.forEach((obj) => {
+          obj.rotation.x += obj.userData.rotVel.x;
+          obj.rotation.y += obj.userData.rotVel.y;
+          obj.rotation.z += obj.userData.rotVel.z;
+          obj.position.y =
+            obj.userData.baseY +
+            Math.sin(clock * obj.userData.floatSpeed + obj.userData.phase) *
+              obj.userData.floatAmp;
+        });
+
+        rising.forEach((b) => {
+          b.position.y += b.userData.speed;
+          b.position.x += b.userData.drift;
+          if (b.position.y > 9) {
+            b.position.y = -9;
+            b.position.x = rng() * 20;
+          }
+        });
+
+        renderer.render(scene, camera);
+      }
+
+      animate();
+
+      // ── Resize ───────────────────────────────────────────────────
+      window.addEventListener("resize", () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+    </script>
+  </body>
+</html>
