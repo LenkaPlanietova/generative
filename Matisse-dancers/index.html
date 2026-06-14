@@ -29,7 +29,6 @@
       const GREEN = [26, 111, 80];
       const SALMON = [240, 158, 130];
       const DARK = [30, 20, 18];
-      const OUTLINE = [40, 90, 70];
 
       let dancers = [];
       let t = 0;
@@ -60,15 +59,15 @@
         background(...BLUE);
         let cx = width / 2;
         let cy = height / 2;
-        let radius = min(width, height) * 0.28;
+        let radius = min(width, height) * 0.36;
         drawHill();
         for (let i = 0; i < dancers.length; i++) {
           let d = dancers[i];
-          let a = d.baseAngle + sin(t * 0.4 + d.phase) * 0.18;
+          let a = d.baseAngle + sin(t * 0.35 + d.phase) * 0.22;
           let x = cx + cos(a) * radius;
-          let y = cy + sin(a) * radius * 0.55 + height * 0.08;
-          let sway = sin(t + d.phase) * 0.12;
-          drawFigure(x, y, d.scale, sway, a);
+          let y = cy + sin(a) * radius * 0.52 + height * 0.06;
+          let sway = sin(t * 0.9 + d.phase) * 0.18;
+          drawFigure(x, y, d.scale, sway);
         }
         drawHandLinks(cx, cy, radius);
       }
@@ -87,131 +86,102 @@
         endShape(CLOSE);
       }
 
-      function drawFigure(cx, cy, sc, sway, facing) {
+      function drawBlob(x, y, w, h, angle) {
+        push();
+        translate(x, y);
+        rotate(angle);
+        ellipse(0, 0, w, h);
+        pop();
+      }
+
+      function drawFigure(cx, cy, sc, sway) {
         push();
         translate(cx, cy);
         rotate(sway);
-        scale(sc * min(width, height) * 0.001);
-        strokeWeight(3.5);
-        stroke(...OUTLINE);
-        fill(...SALMON);
+        scale(sc * min(width, height) * 0.0024);
 
-        // Torso
-        beginShape();
-        curveVertex(-18, -30);
-        curveVertex(-15, -60);
-        curveVertex(0, -75);
-        curveVertex(15, -60);
-        curveVertex(18, -30);
-        curveVertex(10, 20);
-        curveVertex(-10, 20);
-        curveVertex(-18, -30);
-        endShape(CLOSE);
-
-        // Hips
-        beginShape();
-        curveVertex(-22, 18);
-        curveVertex(-18, 10);
-        curveVertex(0, 8);
-        curveVertex(18, 10);
-        curveVertex(22, 18);
-        curveVertex(14, 35);
-        curveVertex(-14, 35);
-        curveVertex(-22, 18);
-        endShape(CLOSE);
-
-        // Left leg
-        beginShape();
-        curveVertex(-14, 32);
-        curveVertex(-18, 55);
-        curveVertex(-20 + sin(sway * 4) * 8, 90);
-        curveVertex(-14, 120);
-        curveVertex(-8, 120);
-        curveVertex(-10, 90);
-        curveVertex(-8, 55);
-        curveVertex(-6, 32);
-        endShape(CLOSE);
-
-        // Right leg
-        beginShape();
-        curveVertex(6, 32);
-        curveVertex(8, 55);
-        curveVertex(16 + sin(sway * 3) * 10, 90);
-        curveVertex(14, 120);
-        curveVertex(20, 120);
-        curveVertex(24, 90);
-        curveVertex(20, 55);
-        curveVertex(14, 32);
-        endShape(CLOSE);
-
-        // Left arm
-        beginShape();
-        curveVertex(-15, -55);
-        curveVertex(-30, -65);
-        curveVertex(-55 + sin(sway * 2) * 12, -80);
-        curveVertex(-70, -75);
-        curveVertex(-65, -68);
-        curveVertex(-50, -72);
-        curveVertex(-28, -58);
-        curveVertex(-10, -48);
-        endShape(CLOSE);
-
-        // Right arm
-        beginShape();
-        curveVertex(15, -55);
-        curveVertex(30, -65);
-        curveVertex(55 + sin(sway * 2) * 12, -78);
-        curveVertex(70, -72);
-        curveVertex(65, -65);
-        curveVertex(50, -70);
-        curveVertex(28, -58);
-        curveVertex(10, -48);
-        endShape(CLOSE);
-
-        // Head
-        fill(...SALMON);
-        ellipse(0, -88, 28, 32);
-
-        // Hair
-        fill(...DARK);
         noStroke();
-        beginShape();
-        curveVertex(-8, -100);
-        curveVertex(-14, -95);
-        curveVertex(-10, -76);
-        curveVertex(0, -72);
-        curveVertex(10, -76);
-        curveVertex(14, -95);
-        curveVertex(8, -100);
-        curveVertex(0, -108);
-        endShape(CLOSE);
+        fill(...SALMON);
+
+        let legL = sin(sway * 3.5) * 0.12;
+        let legR = sin(sway * 2.8 + 1.2) * 0.14;
+        let armL = sin(sway * 2.2) * 0.18;
+        let armR = sin(sway * 2.2 + 0.6) * 0.2;
+
+        // Overlapping soft blobs — Matisse cut-out style
+        drawBlob(-16, 128, 44, 148, legL);
+        drawBlob(16, 128, 44, 148, legR);
+        drawBlob(0, -18, 78, 118, 0);
+        drawBlob(0, -96, 54, 58, 0);
+        drawBlob(-52, -42, 88, 34, -0.75 + armL);
+        drawBlob(58, -52, 96, 36, 0.65 + armR);
+
+        // Hair cap
+        fill(...DARK);
+        drawBlob(0, -118, 48, 36, 0);
 
         pop();
       }
 
+      function drawSolidRibbon(x1, y1, x2, y2, arch, thickness) {
+        let mx = (x1 + x2) / 2;
+        let my = (y1 + y2) / 2 + arch;
+        let steps = 14;
+        let top = [];
+        let bot = [];
+        for (let i = 0; i <= steps; i++) {
+          let u = i / steps;
+          let omu = 1 - u;
+          let px = omu * omu * x1 + 2 * omu * u * mx + u * u * x2;
+          let py = omu * omu * y1 + 2 * omu * u * my + u * u * y2;
+          let tx = 2 * omu * (mx - x1) + 2 * u * (x2 - mx);
+          let ty = 2 * omu * (my - y1) + 2 * u * (y2 - my);
+          let len = sqrt(tx * tx + ty * ty) || 1;
+          let nx = (-ty / len) * thickness * 0.5;
+          let ny = (tx / len) * thickness * 0.5;
+          top.push({ x: px + nx, y: py + ny });
+          bot.push({ x: px - nx, y: py - ny });
+        }
+        beginShape();
+        for (let p of top) vertex(p.x, p.y);
+        for (let i = bot.length - 1; i >= 0; i--) vertex(bot[i].x, bot[i].y);
+        endShape(CLOSE);
+      }
+
+      function dancerHandPos(cx, cy, radius, d) {
+        let a = d.baseAngle + sin(t * 0.35 + d.phase) * 0.22;
+        let sway = sin(t * 0.9 + d.phase) * 0.18;
+        let x = cx + cos(a) * radius;
+        let y = cy + sin(a) * radius * 0.52 + height * 0.06;
+        let s = d.scale * min(width, height) * 0.0024;
+        let armR = sin(sway * 2.2 + 0.6) * 0.2;
+        let armAngle = 0.65 + armR;
+        let lx = 58 + cos(armAngle) * 48;
+        let ly = -52 + sin(armAngle) * 48;
+        return {
+          x: x + (cos(sway) * lx - sin(sway) * ly) * s,
+          y: y + (sin(sway) * lx + cos(sway) * ly) * s,
+        };
+      }
+
       function drawHandLinks(cx, cy, radius) {
-        stroke(...SALMON, 80);
-        strokeWeight(2);
-        noFill();
+        noStroke();
+        fill(...SALMON);
         let count = dancers.length;
+        let linkW = min(width, height) * 0.048;
         for (let i = 0; i < count; i++) {
           let d1 = dancers[i];
           let d2 = dancers[(i + 1) % count];
-          let a1 = d1.baseAngle + sin(t * 0.4 + d1.phase) * 0.18;
-          let a2 = d2.baseAngle + sin(t * 0.4 + d2.phase) * 0.18;
-          let x1 = cx + cos(a1) * radius;
-          let y1 = cy + sin(a1) * radius * 0.55 + height * 0.08;
-          let x2 = cx + cos(a2) * radius;
-          let y2 = cy + sin(a2) * radius * 0.55 + height * 0.08;
-          let mx = (x1 + x2) / 2;
-          let my = (y1 + y2) / 2 - 40;
-          beginShape();
-          curveVertex(x1, y1 - min(width, height) * 0.065);
-          curveVertex(x1, y1 - min(width, height) * 0.065);
-          curveVertex(mx, my);
-          curveVertex(x2, y2 - min(width, height) * 0.065);
-          curveVertex(x2, y2 - min(width, height) * 0.065);
-          endShape();
+          let h1 = dancerHandPos(cx, cy, radius, d1);
+          let h2 = dancerHandPos(cx, cy, radius, d2);
+          drawSolidRibbon(
+            h1.x,
+            h1.y,
+            h2.x,
+            h2.y,
+            -min(width, height) * 0.06,
+            linkW,
+          );
         }
       }
 

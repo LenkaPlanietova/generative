@@ -1,0 +1,206 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Self Portrait — Topography</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        background: #0a0a0a;
+        overflow: hidden;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+      }
+      canvas {
+        display: block;
+        max-width: 100vw;
+        max-height: 100vh;
+      }
+      #loading {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #888;
+        font: 14px/1.4 system-ui, sans-serif;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="loading">Drawing contours…</div>
+    <canvas id="c"></canvas>
+    <script>
+      const canvas = document.getElementById("c");
+      const ctx = canvas.getContext("2d");
+      const loading = document.getElementById("loading");
+
+      const LEVELS = 36;
+      const MIN_BRIGHT = 0.07;
+      const MAX_BRIGHT = 0.93;
+      const GRID_STEP = 2;
+
+      const img = new Image();
+      img.src = "portrait.png";
+
+      // marching squares edge pairs: 0=top, 1=right, 2=bottom, 3=left
+      const LINES = [
+        [],
+        [[3, 0]],
+        [[0, 1]],
+        [[3, 1]],
+        [[1, 2]],
+        [
+          [3, 0],
+          [1, 2],
+        ],
+        [[0, 2]],
+        [[3, 2]],
+        [[2, 3]],
+        [[2, 0]],
+        [
+          [0, 1],
+          [2, 3],
+        ],
+        [[2, 1]],
+        [[1, 3]],
+        [[1, 0]],
+        [[0, 3]],
+        [],
+      ];
+
+      function lerp(a, b, t) {
+        return a + (b - a) * t;
+      }
+
+      function interp(x1, y1, v1, x2, y2, v2, threshold) {
+        const d = v2 - v1;
+        const t = d === 0 ? 0.5 : (threshold - v1) / d;
+        return [lerp(x1, x2, t), lerp(y1, y2, t)];
+      }
+
+      function sample(grid, w, h, x, y) {
+        return grid[Math.min(y, h - 1) * w + Math.min(x, w - 1)];
+      }
+
+      function contourSegments(grid, w, h, threshold) {
+        const verts = [];
+        const segs = [];
+
+        for (let y = 0; y < h - 1; y++) {
+          for (let x = 0; x < w - 1; x++) {
+            const tl = sample(grid, w, h, x, y);
+            const tr = sample(grid, w, h, x + 1, y);
+            const br = sample(grid, w, h, x + 1, y + 1);
+            const bl = sample(grid, w, h, x, y + 1);
+
+            let idx = 0;
+            if (tl >= threshold) idx |= 1;
+            if (tr >= threshold) idx |= 2;
+            if (br >= threshold) idx |= 4;
+            if (bl >= threshold) idx |= 8;
+
+            const pairs = LINES[idx];
+            if (!pairs.length) continue;
+
+            const px = x * GRID_STEP;
+            const py = y * GRID_STEP;
+
+            verts[0] = interp(px, py, tl, px + GRID_STEP, py, tr, threshold);
+            verts[1] = interp(px + GRID_STEP, py, tr, px + GRID_STEP, py + GRID_STEP, br, threshold);
+            verts[2] = interp(px + GRID_STEP, py + GRID_STEP, br, px, py + GRID_STEP, bl, threshold);
+            verts[3] = interp(px, py + GRID_STEP, bl, px, py, tl, threshold);
+
+            for (const [a, b] of pairs) {
+              segs.push([verts[a], verts[b]]);
+            }
+          }
+        }
+        return segs;
+      }
+
+      function buildGrid(imageData, w, h) {
+        const src = imageData.data;
+        const gridW = Math.ceil(w / GRID_STEP);
+        const gridH = Math.ceil(h / GRID_STEP);
+        const grid = new Float32Array(gridW * gridH);
+
+        for (let gy = 0; gy < gridH; gy++) {
+          for (let gx = 0; gx < gridW; gx++) {
+            const sx = Math.min(gx * GRID_STEP, w - 1);
+            const sy = Math.min(gy * GRID_STEP, h - 1);
+            const i = (sy * w + sx) * 4;
+            const r = src[i];
+            const g = src[i + 1];
+            const b = src[i + 2];
+            grid[gy * gridW + gx] = (r * 0.299 + g * 0.587 + b * 0.114) / 255;
+          }
+        }
+        return { grid, gridW, gridH };
+      }
+
+      function layout() {
+        const maxW = window.innerWidth * 0.92;
+        const maxH = window.innerHeight * 0.92;
+        const scale = Math.min(maxW / img.width, maxH / img.height);
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        canvas.width = w;
+        canvas.height = h;
+        return { w, h };
+      }
+
+      function draw() {
+        const { w, h } = layout();
+
+        const off = document.createElement("canvas");
+        off.width = w;
+        off.height = h;
+        const offCtx = off.getContext("2d");
+        offCtx.drawImage(img, 0, 0, w, h);
+        const { grid, gridW, gridH } = buildGrid(offCtx.getImageData(0, 0, w, h), w, h);
+
+        ctx.fillStyle = "#0a0a0a";
+        ctx.fillRect(0, 0, w, h);
+
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+
+        for (let i = 0; i < LEVELS; i++) {
+          const t = i / (LEVELS - 1);
+          const threshold = MIN_BRIGHT + t * (MAX_BRIGHT - MIN_BRIGHT);
+          const isMajor = i % 6 === 0;
+          const alpha = isMajor ? 0.55 : 0.28 + 0.22 * Math.sin(t * Math.PI);
+          ctx.strokeStyle = `rgba(235, 228, 218, ${alpha})`;
+          ctx.lineWidth = isMajor ? 0.9 : 0.45;
+
+          const segs = contourSegments(grid, gridW, gridH, threshold);
+          for (const [[x1, y1], [x2, y2]] of segs) {
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.stroke();
+          }
+        }
+
+        loading.style.display = "none";
+      }
+
+      img.onload = draw;
+      img.onerror = () => {
+        loading.textContent = "Could not load portrait.png";
+      };
+      window.addEventListener("resize", () => {
+        if (img.complete) draw();
+      });
+    </script>
+  </body>
+</html>

@@ -1,104 +1,152 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
-<head>
-  <meta charset="UTF-8">
-  <title>mouse waves</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #000; overflow: hidden; }
-    canvas { display: block; }
-  </style>
-</head>
-<body>
-  <canvas id="c"></canvas>
-  <script>
-    const canvas = document.getElementById('c');
-    const ctx = canvas.getContext('2d');
-
-    let W, H;
-    function resize() {
-      W = canvas.width = window.innerWidth;
-      H = canvas.height = window.innerHeight;
-    }
-    resize();
-    window.addEventListener('resize', resize);
-
-    const mouse = { x: W / 2, y: H / 2 };
-    window.addEventListener('mousemove', e => {
-      mouse.x = e.clientX;
-      mouse.y = e.clientY;
-    });
-
-    const LINE_COUNT = 28;
-    const CHAIN_LENGTH = 80;
-    const DELAY = 0.055;
-
-    const snakes = [];
-
-    for (let i = 0; i < LINE_COUNT; i++) {
-      const t = i / (LINE_COUNT - 1);
-      const yOffset = (t - 0.5) * H * 1.1;
-      const chain = [];
-      for (let j = 0; j < CHAIN_LENGTH; j++) {
-        chain.push({ x: W / 2, y: H / 2 + yOffset });
+  <head>
+    <meta charset="UTF-8" />
+    <title>mouse waves</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
       }
-      snakes.push({ chain, yOffset, t });
-    }
+      body {
+        background: #000;
+        overflow: hidden;
+      }
+      canvas {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="c"></canvas>
+    <script>
+      const canvas = document.getElementById("c");
+      const ctx = canvas.getContext("2d");
 
-    function wiggle(t, time, freq, amp) {
-      return Math.sin(t * freq + time) * amp + Math.sin(t * freq * 1.7 + time * 0.6) * amp * 0.5;
-    }
+      let W, H;
+      function resize() {
+        W = canvas.width = window.innerWidth;
+        H = canvas.height = window.innerHeight;
+      }
+      resize();
+      window.addEventListener("resize", resize);
 
-    let time = 0;
+      const mouse = { x: W / 2, y: H / 2 };
+      window.addEventListener("mousemove", (e) => {
+        mouse.x = e.clientX;
+        mouse.y = e.clientY;
+      });
 
-    function draw() {
-      time += 0.008;
+      const LINE_COUNT = 28;
+      const CHAIN_LENGTH = 80;
+      const DELAY = 0.055;
+      const ECHO_COUNT = 5;
+      const ECHO_GAP = 7;
 
-      ctx.fillStyle = 'rgba(0,0,0,0.18)';
-      ctx.fillRect(0, 0, W, H);
+      const mouseHistory = [];
 
-      for (let s = 0; s < snakes.length; s++) {
-        const snake = snakes[s];
-        const chain = snake.chain;
-        const yOff = snake.yOffset;
-        const t = snake.t;
-
-        const noiseX = wiggle(t, time, 3.5, 60);
-        const noiseY = wiggle(t, time * 1.3, 2.8, 40);
-
-        const targetX = mouse.x + noiseX;
-        const targetY = mouse.y + yOff + noiseY;
-
-        chain[0].x += (targetX - chain[0].x) * DELAY;
-        chain[0].y += (targetY - chain[0].y) * DELAY;
-
-        for (let j = 1; j < CHAIN_LENGTH; j++) {
-          chain[j].x += (chain[j - 1].x - chain[j].x) * DELAY;
-          chain[j].y += (chain[j - 1].y - chain[j].y) * DELAY;
+      function makeSnakes() {
+        const arr = [];
+        for (let i = 0; i < LINE_COUNT; i++) {
+          const t = i / (LINE_COUNT - 1);
+          const yOffset = (t - 0.5) * H * 1.1;
+          const chain = [];
+          for (let j = 0; j < CHAIN_LENGTH; j++) {
+            chain.push({ x: W / 2, y: H / 2 + yOffset });
+          }
+          arr.push({ chain, yOffset, t });
         }
-
-        const brightness = 0.55 + 0.45 * Math.sin(t * Math.PI);
-        const alpha = 0.6 + 0.4 * brightness;
-
-        ctx.beginPath();
-        ctx.moveTo(chain[0].x, chain[0].y);
-        for (let j = 1; j < CHAIN_LENGTH - 2; j++) {
-          const mx = (chain[j].x + chain[j + 1].x) / 2;
-          const my = (chain[j].y + chain[j + 1].y) / 2;
-          ctx.quadraticCurveTo(chain[j].x, chain[j].y, mx, my);
-        }
-
-        ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
-        ctx.lineWidth = 1.2 + brightness * 0.8;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.stroke();
+        return arr;
       }
 
-      requestAnimationFrame(draw);
-    }
+      const snakes = makeSnakes();
+      const echoSnakes = Array.from({ length: ECHO_COUNT }, () => makeSnakes());
 
-    draw();
-  </script>
-</body>
+      function wiggle(t, time, freq, amp) {
+        return (
+          Math.sin(t * freq + time) * amp +
+          Math.sin(t * freq * 1.7 + time * 0.6) * amp * 0.5
+        );
+      }
+
+      let time = 0;
+
+      function updateAndDrawSnakes(
+        snakeSet,
+        targetX,
+        targetY,
+        alphaScale,
+        widthScale,
+      ) {
+        for (let s = 0; s < snakeSet.length; s++) {
+          const snake = snakeSet[s];
+          const chain = snake.chain;
+          const yOff = snake.yOffset;
+          const t = snake.t;
+
+          const noiseX = wiggle(t, time, 3.5, 60);
+          const noiseY = wiggle(t, time * 1.3, 2.8, 40);
+
+          const aimX = targetX + noiseX;
+          const aimY = targetY + yOff + noiseY;
+
+          chain[0].x += (aimX - chain[0].x) * DELAY;
+          chain[0].y += (aimY - chain[0].y) * DELAY;
+
+          for (let j = 1; j < CHAIN_LENGTH; j++) {
+            chain[j].x += (chain[j - 1].x - chain[j].x) * DELAY;
+            chain[j].y += (chain[j - 1].y - chain[j].y) * DELAY;
+          }
+
+          const brightness = 0.55 + 0.45 * Math.sin(t * Math.PI);
+          const alpha = (0.6 + 0.4 * brightness) * alphaScale;
+
+          ctx.beginPath();
+          ctx.moveTo(chain[0].x, chain[0].y);
+          for (let j = 1; j < CHAIN_LENGTH - 2; j++) {
+            const mx = (chain[j].x + chain[j + 1].x) / 2;
+            const my = (chain[j].y + chain[j + 1].y) / 2;
+            ctx.quadraticCurveTo(chain[j].x, chain[j].y, mx, my);
+          }
+
+          ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
+          ctx.lineWidth = (0.2 + brightness * 0.2) * widthScale;
+          ctx.lineCap = "round";
+          ctx.lineJoin = "round";
+          ctx.stroke();
+        }
+      }
+
+      function draw() {
+        time += 0.008;
+
+        mouseHistory.unshift({ x: mouse.x, y: mouse.y });
+        if (mouseHistory.length > ECHO_COUNT * ECHO_GAP + 1) {
+          mouseHistory.length = ECHO_COUNT * ECHO_GAP + 1;
+        }
+
+        ctx.fillStyle = "rgba(0,0,0,0.18)";
+        ctx.fillRect(0, 0, W, H);
+
+        for (let e = ECHO_COUNT; e >= 1; e--) {
+          const past = mouseHistory[e * ECHO_GAP] || mouse;
+          const fade = 1 - e / (ECHO_COUNT + 1);
+          updateAndDrawSnakes(
+            echoSnakes[e - 1],
+            past.x,
+            past.y,
+            fade * 0.4,
+            0.9,
+          );
+        }
+
+        updateAndDrawSnakes(snakes, mouse.x, mouse.y, 1, 1);
+
+        requestAnimationFrame(draw);
+      }
+
+      draw();
+    </script>
+  </body>
 </html>

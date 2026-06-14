@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Breathing Grid</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/p5@1.9.4/lib/p5.min.js"></script>
+
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #111;
+      font-family: Arial, sans-serif;
+    }
+
+    .label {
+      position: fixed;
+      left: 20px;
+      bottom: 20px;
+      color: white;
+      opacity: 0.7;
+      font-size: 14px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="label">
+    Move mouse · Click to randomize · Press S to save
+  </div>
+
+  <script>
+    let spacing = 35;
+    let maxSize = 22;
+    let noiseOffset = 0;
+    let seedValue = 1;
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      noStroke();
+      randomSeed(seedValue);
+    }
+
+    function draw() {
+      background(17, 17, 17, 35);
+
+      noiseOffset += 0.01;
+
+      for (let x = spacing; x < width; x += spacing) {
+        for (let y = spacing; y < height; y += spacing) {
+          let distanceToMouse = dist(mouseX, mouseY, x, y);
+
+          let mouseEffect = map(distanceToMouse, 0, 300, 1, 0);
+          mouseEffect = constrain(mouseEffect, 0, 1);
+
+          let breathing = sin(frameCount * 0.04 + x * 0.02 + y * 0.02);
+          let noiseValue = noise(x * 0.01, y * 0.01, noiseOffset);
+
+          let size = 4 + mouseEffect * maxSize + breathing * 4 + noiseValue * 8;
+
+          let brightness = map(size, 4, maxSize + 12, 80, 255);
+
+          fill(brightness);
+          circle(x, y, size);
+        }
+      }
+    }
+
+    function mousePressed() {
+      seedValue = random(10000);
+      randomSeed(seedValue);
+      noiseSeed(seedValue);
+    }
+
+    function keyPressed() {
+      if (key === 's' || key === 'S') {
+        saveCanvas('breathing-grid', 'png');
+      }
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+    }
+  </script>
+</body>
+</html>
