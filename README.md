@@ -9,11 +9,11 @@ Built with p5.js, vanilla Canvas API, and whatever feels right.
 
 | project | description | live |
 |---------|-------------|------|
-| [wavy-lines](./wavy-lines/) | white flow lines reacting to mouse movement | [↗ demo](https://lenkaPlanietova.github.io/generative/wavy-lines/) |
-| [mouse-waves](./mouse-waves%20/) | animated wave patterns driven by mouse position | — |
-| [Matisse-dancers](./Matisse-dancers/) | generative figures inspired by Matisse's dancers | — |
-| [interactive-web-sketch-01](./interactive-web-sketch-01/) | breathing grid of dots reacting to mouse and time | — |
-| [self-portrait](./self-portrait/) | generative self-portrait experiment | — |
+| [wavy-lines](./wavy-lines/) | white flow lines reacting to mouse movement | [↗ demo](https://lenkaplanietova.github.io/generative/wavy-lines/) |
+| [mouse-waves](./mouse-waves%20/) | animated wave patterns driven by mouse position | [↗ demo](https://lenkaplanietova.github.io/generative/mouse-waves%20/) |
+| [Matisse-dancers](./Matisse-dancers/) | generative figures inspired by Matisse's dancers | [↗ demo](https://lenkaplanietova.github.io/generative/Matisse-dancers/) |
+| [interactive-web-sketch-01](./interactive-web-sketch-01/) | breathing grid of dots reacting to mouse and time | [↗ demo](https://lenkaplanietova.github.io/generative/interactive-web-sketch-01/) |
+| [self-portrait](./self-portrait/) | generative self-portrait experiment | [↗ demo](https://lenkaplanietova.github.io/generative/self-portrait/) |
 
 ---
 
