@@ -15,6 +15,7 @@ Built with p5.js, vanilla Canvas API, and whatever feels right.
 | [interactive-web-sketch-01](./interactive-web-sketch-01/) | breathing grid of dots reacting to mouse and time | [↗ demo](https://lenkaplanietova.github.io/generative/interactive-web-sketch-01/) |
 | [self-portrait](./self-portrait/) | generative self-portrait experiment | [↗ demo](https://lenkaplanietova.github.io/generative/self-portrait/) |
 | [ester-3d](./ester-3d/) | interactive 3D candy-style name animation | [↗ demo](https://lenkaplanietova.github.io/generative/ester-3d/) |
+| [fibonacci-bloom](./fibonacci-bloom/) | generative Fibonacci spiral — Python, NumPy, Matplotlib | — |
 
 ---
 
