@@ -16,6 +16,7 @@ Built with p5.js, Three.js, vanilla Canvas API, Python, and whatever feels right
 | [self-portrait](./self-portrait/) | generative self-portrait experiment | [↗ demo](https://lenkaplanietova.github.io/generative/self-portrait/) |
 | [ester-3d](./ester-3d/) | interactive 3D candy-style name animation | [↗ demo](https://lenkaplanietova.github.io/generative/ester-3d/) |
 | [fibonacci-bloom](./fibonacci-bloom/) | interactive 3D Fibonacci spiral — golden ratio phyllotaxis, orbit camera | [↗ demo](https://lenkaplanietova.github.io/generative/fibonacci-bloom/) |
+| [diamond-swarm](./diamond-swarm/) | 20 000 instanced particles lerping into a diamond cut surface with bloom | [↗ demo](https://lenkaplanietova.github.io/generative/diamond-swarm/) |
 
 ---
 
