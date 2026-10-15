@@ -1,16 +1,6 @@
-import { type Path, pathLength } from "../core/path";
+import type { Path } from "../core/path";
 
-/** Pen-up distance when drawing `lines` in the given order, starting from (sx, sy). */
-export function penUpTravel(lines: Path[], sx = 0, sy = 0): number {
-  let cx = sx, cy = sy, t = 0;
-  for (const L of lines) {
-    t += Math.hypot(L[0] - cx, L[1] - cy);
-    cx = L[L.length - 2]; cy = L[L.length - 1];
-  }
-  return t;
-}
-
-/** Greedy nearest-neighbour ordering with path reversal, to cut pen-up travel. */
+/** Greedy nearest-neighbour ordering with path reversal, to cut pen-up travel (flat-array form, as in the reference). */
 export function orderPaths(lines: Path[], sx = 0, sy = 0): { lines: Path[]; travel: number } {
   const n = lines.length, used = new Uint8Array(n), out: Path[] = [];
   let cx = sx, cy = sy, travel = 0;
@@ -36,31 +26,4 @@ export function orderPaths(lines: Path[], sx = 0, sy = 0): { lines: Path[]; trav
     cx = L[L.length - 2]; cy = L[L.length - 1];
   }
   return { lines: out, travel };
-}
-
-export interface PlotSpeeds {
-  /** Pen-down drawing speed, mm/s. */
-  drawSpeed: number;
-  /** Pen-up travel speed, mm/s. */
-  travelSpeed: number;
-  /** Time per pen lift + drop, s. */
-  penLift: number;
-}
-
-export const DEFAULT_SPEEDS: PlotSpeeds = { drawSpeed: 30, travelSpeed: 75, penLift: 0.35 };
-
-export interface PlotStats {
-  paths: number;
-  /** mm */
-  ink: number;
-  /** mm */
-  travel: number;
-  /** s */
-  time: number;
-}
-
-export function plotStats(lines: Path[], speeds: PlotSpeeds = DEFAULT_SPEEDS, travel = penUpTravel(lines)): PlotStats {
-  let ink = 0;
-  for (const L of lines) ink += pathLength(L);
-  return { paths: lines.length, ink, travel, time: ink / speeds.drawSpeed + travel / speeds.travelSpeed + lines.length * speeds.penLift };
 }
