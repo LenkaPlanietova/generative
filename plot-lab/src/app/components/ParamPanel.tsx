@@ -43,7 +43,7 @@ function PaperControls() {
         options={[{ value: "portrait", label: "Portrait" }, { value: "landscape", label: "Landscape" }]} />
       <NumberControl id="margin" label="Margin" value={paper.margin} min={0} max={80} step={1} unit="mm" defaultValue={20}
         onChange={(v) => setPaper({ margin: v })} onReset={() => setPaper({ margin: 20 })} />
-      <p className="font-mono text-[11px] text-faint">Sheet {sheet.width} × {sheet.height} mm · drawing area {sheet.area.width} × {sheet.area.height} mm</p>
+      <p className="font-mono text-[11px] text-faint">Paper size {sheet.width} × {sheet.height} mm · drawing area {sheet.area.width} × {sheet.area.height} mm</p>
       <div className="mt-1 border-t border-line pt-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-faint">Plotter · {profile.name}</div>
       <NumberControl id="maxWidth" label="Drawing area width" description="Your machine's usable width. 0 = not set." value={profile.maxWidth} min={0} max={1500} step={1} unit="mm" onChange={(v) => setProfile({ maxWidth: v })} />
       <NumberControl id="maxHeight" label="Drawing area height" description="Your machine's usable height. 0 = not set." value={profile.maxHeight} min={0} max={1500} step={1} unit="mm" onChange={(v) => setProfile({ maxHeight: v })} />

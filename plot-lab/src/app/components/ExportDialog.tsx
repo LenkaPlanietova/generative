@@ -66,7 +66,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
           </div>
           <div className="grid content-start gap-3">
             <div className="grid grid-cols-2 gap-x-3 gap-y-1 font-mono text-[11.5px] tabular-nums">
-              <span className="text-faint">Size</span><span>{sheet.width} × {sheet.height} mm</span>
+              <span className="text-faint">Paper size</span><span>{sheet.width} × {sheet.height} mm</span>
               <span className="text-faint">viewBox</span><span>0 0 {sheet.width} {sheet.height}</span>
               <span className="text-faint">Stroke</span><span>{settings.penWidth} mm {settings.strokeColor}</span>
               {stats && <>
@@ -93,9 +93,10 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
         </div>
         <footer className="flex items-center gap-2 border-t border-line px-4 py-3">
           <span className="flex-1 text-[12px] text-muted" role="status">{notice || filename}</span>
-          <button type="button" disabled={!svg || errors.length > 0} onClick={() => navigator.clipboard.writeText(svg).then(() => setNotice("SVG copied"), () => setNotice("Clipboard blocked"))}
-            className="flex items-center gap-1.5 rounded-md border border-line bg-raised px-3 py-1.5 text-fg disabled:opacity-40"><Copy size={14} /> Copy</button>
-          <button type="button" disabled={!svg || errors.length > 0} onClick={download}
+          <button type="button" disabled={!svg || errors.length > 0} title="Copies the SVG code to the clipboard, to paste straight into Inkscape (Edit → Paste) or a text editor. No file is saved."
+            onClick={() => navigator.clipboard.writeText(svg).then(() => setNotice("SVG copied to the clipboard — paste it into Inkscape or a text editor"), () => setNotice("Clipboard blocked by the browser"))}
+            className="flex items-center gap-1.5 rounded-md border border-line bg-raised px-3 py-1.5 text-fg disabled:opacity-40"><Copy size={14} /> Copy to clipboard</button>
+          <button type="button" disabled={!svg || errors.length > 0} onClick={download} title="Saves an .svg file to your Downloads folder"
             className="flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 font-medium text-black disabled:opacity-40"><Download size={14} /> Download SVG</button>
         </footer>
       </div>

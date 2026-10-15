@@ -115,3 +115,19 @@ test("warns when spacing is below 1.2 × pen width", async ({ page }) => {
   await page.locator('[data-control="penWidth"] input[type="number"]').press("Enter");
   await expect(page.getByRole("alert").first()).toContainText("solid black");
 });
+
+test("zoom with the + / − buttons and keys", async ({ page }) => {
+  await page.goto("/");
+  await ready(page);
+  const zoom = () => page.getByTitle(/^Zoom \(100 %/).innerText().then((t) => Number(t.replace("%", "")));
+  const z0 = await zoom();
+  await page.getByRole("button", { name: "Zoom in (+)" }).click();
+  expect(await zoom()).toBeGreaterThan(z0);
+  await page.getByRole("button", { name: "Zoom out (−)" }).click();
+  await page.getByRole("button", { name: "Zoom out (−)" }).click();
+  expect(await zoom()).toBeLessThan(z0);
+  await page.keyboard.press("0");
+  expect(await zoom()).toBe(z0);
+  await page.keyboard.press("+");
+  expect(await zoom()).toBeGreaterThan(z0);
+});

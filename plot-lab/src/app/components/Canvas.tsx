@@ -1,4 +1,4 @@
-import { Expand, Frame, Grid3x3, Route, Scan, Shrink, ZoomIn, ZoomOut } from "lucide-react";
+import { Expand, Frame, Grid3x3, Minus, Plus, Route, Scan, Shrink } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { sheetFor } from "../../core/paper";
 import { drawPathOrder, pathsToPath2D } from "../../render/preview";
@@ -112,6 +112,20 @@ export function Canvas() {
     setCam((cur) => cur && { zoom: cur.zoom * f, x: size.w / 2 - (size.w / 2 - cur.x) * f, y: size.h / 2 - (size.h / 2 - cur.y) * f });
     setFitted(false);
   };
+  // Keyboard: + / − to zoom, 0 to fit (ignored while typing in a field).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement;
+      if (e.metaKey || e.ctrlKey || e.altKey || /^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName) || document.querySelector('[role="dialog"]')) return;
+      if (e.key === "+" || e.key === "=") zoomBy(1.25);
+      else if (e.key === "-" || e.key === "_") zoomBy(1 / 1.25);
+      else if (e.key === "0") fit();
+      else return;
+      e.preventDefault();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
   const actualSize = () => {
     const zoom = CSS_PX_PER_MM;
     setCam({ zoom, x: (size.w - sheet.width * zoom) / 2, y: (size.h - sheet.height * zoom) / 2 });
@@ -132,13 +146,16 @@ export function Canvas() {
         }}
         onPointerUp={() => { drag.current = null; }}
         onDoubleClick={fit} />
+      <p className="pointer-events-none absolute bottom-2 left-3 text-[11px] text-faint">
+        Zoom: − / + buttons, + / − keys or scroll · Drag to move · Double-click or 0 to fit
+      </p>
       <div className="absolute top-3 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-lg border border-line bg-panel/90 p-1 shadow-lg backdrop-blur">
-        <IconButton label="Zoom out" onClick={() => zoomBy(1 / 1.25)}><ZoomOut size={14} /></IconButton>
+        <IconButton label="Zoom out (−)" onClick={() => zoomBy(1 / 1.25)}><Minus size={15} /></IconButton>
         <span className="w-12 text-center font-mono text-[11px] text-muted tabular-nums" title="Zoom (100 % = actual physical size on a 96 dpi screen)">
           {cam ? Math.round((cam.zoom / CSS_PX_PER_MM) * 100) : 0}%
         </span>
-        <IconButton label="Zoom in" onClick={() => zoomBy(1.25)}><ZoomIn size={14} /></IconButton>
-        <IconButton label="Fit to screen" onClick={fit}><Scan size={14} /></IconButton>
+        <IconButton label="Zoom in (+)" onClick={() => zoomBy(1.25)}><Plus size={15} /></IconButton>
+        <IconButton label="Fit to screen (0)" onClick={fit}><Scan size={14} /></IconButton>
         <IconButton label="Actual size" onClick={actualSize}><span className="font-mono text-[10px]">1:1</span></IconButton>
         <span className="mx-1 h-4 w-px bg-line" />
         <IconButton label="Margins" active={view.margins} onClick={() => setView({ margins: !view.margins })}><Frame size={14} /></IconButton>

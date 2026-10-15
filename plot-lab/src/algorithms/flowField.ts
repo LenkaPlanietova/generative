@@ -26,7 +26,7 @@ const parameters: ParameterDefinition[] = [
     description: "Safety limit: tracing stops after this many lines." },
   { id: "minLength", type: "number", group: "Structure", label: "Min line length", default: 4, min: 0, max: 50, step: 0.5, unit: "mm",
     description: "Lines shorter than this are discarded." },
-  { id: "maxLength", type: "number", group: "Structure", label: "Max line length", default: 600, min: 10, max: 3000, step: 10, unit: "mm",
+  { id: "maxLength", type: "number", group: "Structure", label: "Max line length", default: 600, min: 10, max: 20000, step: 10, unit: "mm",
     description: "Lines stop growing at this length." },
   // Geometry
   { id: "stepSize", type: "number", group: "Geometry", label: "Step size", default: 0.35, min: 0.1, max: 1, step: 0.05, unit: "×",

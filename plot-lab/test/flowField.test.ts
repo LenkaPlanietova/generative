@@ -73,6 +73,7 @@ describe("Flow Field algorithm", () => {
     expect(r.maxTurn).toBe(35);
     expect(r.density).toBe("radial");
     expect(r.noiseSize).toBe(60);
+    expect(resolveParams(flowField, { maxLength: 20000 }).maxLength).toBe(20000);
   });
 });
 
