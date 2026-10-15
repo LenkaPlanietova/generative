@@ -49,7 +49,10 @@ test("generate, adjust, vary, change paper, export a valid plotter SVG", async (
   await page.getByRole("button", { name: "Export SVG" }).click();
   const dialog = page.getByRole("dialog", { name: "Export SVG" });
   await expect(dialog.getByTestId("validation")).toContainText("All export checks passed");
+  // The preview image really loads (a revoked or broken blob URL leaves naturalWidth at 0).
+  await expect.poll(() => dialog.getByTestId("svg-preview").evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
   const [download] = await Promise.all([page.waitForEvent("download"), dialog.getByRole("button", { name: "Download SVG" }).click()]);
+  expect(await download.failure()).toBeNull();
   const svg = await readFile((await download.path())!, "utf8");
 
   // Parse, check, and render the exported file in the browser.
