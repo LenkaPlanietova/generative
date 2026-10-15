@@ -53,6 +53,8 @@ export interface GenerativeAlgorithm {
   category: string;
   description: string;
   parameters: ParameterDefinition[];
+  /** Whether the seed changes the result for these values (pure-maths curves ignore it unless wobble is on). */
+  usesSeed?: (values: ParamValues) => boolean;
   generate(settings: GenerationSettings): Promise<GeometryCollection>;
 }
 

@@ -7,7 +7,8 @@ import { MAX_SEED, currentParams, useSettings } from "../../store/settings";
 import { ColorControl, IconButton, Notice, NumberControl, Section, SelectControl, ToggleControl } from "./ui";
 
 function SeedControls() {
-  const { seed, seedLocked, seedHistory, setSeed, randomSeed, nextVariation, previousSeed, setSeedLocked } = useSettings();
+  const state = useSettings(), { seed, seedLocked, seedHistory, setSeed, randomSeed, nextVariation, previousSeed, setSeedLocked } = state;
+  const algo = getAlgorithm(state.algorithmId)!, usesSeed = algo.usesSeed ? algo.usesSeed(currentParams(state)) : true;
   return (
     <div className="grid gap-2">
       <div className="flex items-center gap-1.5">
@@ -24,6 +25,9 @@ function SeedControls() {
         <IconButton label="Next variation (seed + 1)" onClick={nextVariation} disabled={seedLocked}><SkipForward size={13} /><span className="text-[12px]">Next</span></IconButton>
         <IconButton label="Restore previous seed" onClick={previousSeed} disabled={seedLocked || !seedHistory.length}><Undo2 size={13} /><span className="text-[12px]">Back</span></IconButton>
       </div>
+      {!usesSeed && <p className="text-[11.5px] leading-snug text-faint" data-testid="seed-unused">
+        With these settings {algo.name} is exact maths, so the seed has no effect. Turn up Wobble, Noise or Detune to use it.
+      </p>}
     </div>
   );
 }

@@ -131,3 +131,23 @@ test("zoom with the + / − buttons and keys", async ({ page }) => {
   await page.keyboard.press("+");
   expect(await zoom()).toBeGreaterThan(z0);
 });
+
+test("every algorithm generates and passes export validation", async ({ page }) => {
+  await page.goto("/");
+  await ready(page);
+  for (const name of ["Contour Field", "Wave Distortion", "Radial Geometry", "Spirograph", "Lissajous Curves", "Harmonograph", "Flow Field"]) {
+    await page.getByRole("button", { name: new RegExp(`^${name}`) }).click();
+    await expect(page.locator("header")).toContainText(name);
+    await expect.poll(async () => (await page.getByTestId("gen-status").innerText()).includes("Ready"), { timeout: 30_000 }).toBe(true);
+    await page.waitForTimeout(400);
+    await ready(page);
+    expect(await pathCount(page), name).toBeGreaterThan(0);
+    expect(await inkedPixels(page), name).toBeGreaterThan(500);
+    await page.getByRole("button", { name: "Export SVG" }).click();
+    await expect(page.getByRole("dialog").getByTestId("validation"), name).toContainText("All export checks passed");
+    await page.keyboard.press("Escape");
+  }
+  // Pure-maths curves say when the seed has no effect.
+  await page.getByRole("button", { name: /^Spirograph/ }).click();
+  await expect(page.getByTestId("seed-unused")).toBeVisible();
+});

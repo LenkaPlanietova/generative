@@ -35,7 +35,7 @@ export function luminance(color: string): number | null {
 
 export function penWarning(minSpacing: number, penWidth: number): Issue | null {
   return minSpacing < 1.2 * penWidth
-    ? warn("PEN_SPACING", `Min spacing ${minSpacing} mm is under 1.2 × pen width (${(1.2 * penWidth).toFixed(2)} mm): those areas will plot as solid black.`)
+    ? warn("PEN_SPACING", `Darkest spacing ${minSpacing} mm is under 1.2 × pen width (${(1.2 * penWidth).toFixed(2)} mm): those areas will plot as solid black.`)
     : null;
 }
 
