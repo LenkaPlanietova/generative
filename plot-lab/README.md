@@ -3,10 +3,12 @@
 Generative art and pen-plotter studio. Algorithms generate real vector geometry in millimetres; the preview,
 SVG exporter, plotter optimiser and statistics all consume the same geometry.
 
-**Status: Phase 3** (advanced patterns). Phase 1 delivered the app, geometry system, Flow Field, seeds, paper
+**Status: Phase 4** (image-driven art). Phase 1 delivered the app, geometry system, Flow Field, seeds, paper
 sizes, preview and validated SVG export. Phase 2 added Contour Field, Wave Distortion, Radial Geometry, Spirograph,
 Lissajous Curves and Harmonograph. Phase 3 adds Moiré, Guilloché, Interference, Reaction-Diffusion, advanced noise
-(ridged, billowed, domain-warped), Noise Flow and Topographic Fields.
+(ridged, billowed, domain-warped), Noise Flow and Topographic Fields. Phase 4 adds image import (16-bit PNG
+aware), a shared image sampler, Redraw (passes the SPEC_ADDENDUM acceptance test), Contour Portrait (the sculptural
+portrait engine), Wave Portrait, Adaptive Hatching and Image Displacement.
 
 | Algorithm | How it works |
 |---|---|
@@ -22,6 +24,11 @@ Lissajous Curves and Harmonograph. Phase 3 adds Moiré, Guilloché, Interference
 | Moiré | Two to six line or ring systems with rotation, offset, waves and a lens; each system is its own SVG layer. |
 | Guilloché | Bands of phase-shifted closed rosettes r = R + A·env(θ)·sin(fθ + 2πk/n) that interlace into an engraved lattice. |
 | Interference | Sum of circular waves from point sources (circle, line or seeded positions), fringes traced as contours. |
+| Redraw | Structure tensor of a reference image → direction; its tone → spacing; streamline engine with the Python reference's seeding and self-avoidance. |
+| Contour Portrait | Depth map (+ photo relief) → direction, photo → spacing, with fidelity, abstraction, detail preservation and edge sensitivity (spec §8). |
+| Wave Portrait | Parallel lines whose wave amplitude and frequency grow with darkness (phase integrated along the line). |
+| Adaptive Hatching | Up to four hatch directions, each added below a darker tone threshold, each on its own SVG layer. |
+| Image Displacement | Parallel lines displaced by tone (dark, light, or both ways from mid-grey) plus optional noise. |
 | Reaction-Diffusion | Gray-Scott simulation in the worker on a grid with physical cell size (safety limit 400 k cells), exported as contours only. |
 
 ```bash
@@ -43,6 +50,7 @@ npm run build
 | Engine | `src/engine/streamlines.ts` | Jobard–Lefer evenly spaced streamlines with variable separation, ported from `reference/js/streamlines.worker.js`. |
 | Plotter | `src/plotter/` | Optimiser (dedupe, short-path removal, RDP within tolerance, nearest-neighbour ordering with reversal), stats, ink density, plotter profiles. |
 | Export | `src/export/` | Hand-written SVG (mm size + viewBox, Inkscape layers, stroke only) and validation that blocks bad exports. |
+| Images | `src/image/` | PNG via fast-png at full bit depth (16-bit depth maps stay 16-bit), JPEG via the browser; one sampler for fit / scale / position (crop), brightness, contrast, invert and blur; built-in sample head. Images live in memory only. |
 | Worker | `src/worker/`, `src/pipeline.ts` | Generate → stats → optimise → stats, off the main thread. Partial results stream to the preview; each change terminates and restarts the worker (300 ms debounce). |
 | UI | `src/app/`, `src/store/` | React + Zustand + Tailwind + Lucide. Settings persist to localStorage and are validated on load. |
 
@@ -66,5 +74,13 @@ npm run build
 - Flow Field parameters follow SPEC_ADDENDUM §C (streamline engine), mapped onto the spec's control groups:
   seed distribution, line count limit, step size, curvature (max turn), flow direction, noise scale, min spacing
   and randomness (wobble).
+
+## Acceptance test (SPEC_ADDENDUM §D.1)
+
+`test/acceptance.test.ts` decodes `reference/examples/source_lineart.png`, runs Redraw with the README settings on A3
+and checks the result against `redraw_dense_A3.svg`: 1,000–1,100 paths (currently ~1,084 vs 1,058), 30–35 m of ink
+(~33.0 vs 32.5 m), pen-up under 6 m (~4.1 m), and ink-density correlation on a 4 mm grid above 0.93 (~0.97).
+Matching the reference needed two options in the engine that follow the Python tracer rather than the JS worker:
+seed clearance 1 × spacing and per-half self-avoidance.
 
 Reference material for porting: `reference/` (see `reference/README.md`) and `SPEC_ADDENDUM.md`.

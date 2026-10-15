@@ -4,6 +4,7 @@ import { PARAM_GROUPS, type ParameterDefinition, type ParamValues } from "../../
 import { PAPER_NAMES, type PaperName, sheetFor } from "../../core/paper";
 import { penWarning } from "../../export/validate";
 import { MAX_SEED, currentParams, useSettings } from "../../store/settings";
+import { ImageInputs } from "./ImageInputs";
 import { ColorControl, IconButton, Notice, NumberControl, Section, SelectControl, ToggleControl } from "./ui";
 
 function SeedControls() {
@@ -104,13 +105,15 @@ export function ParamPanel() {
       <Section title="Paper & plotter" defaultOpen={false}><PaperControls /></Section>
       {PARAM_GROUPS.map((group) => {
         const defs = algo.parameters.filter((p) => p.group === group && (!p.visibleWhen || p.visibleWhen(values)));
-        const extra = group === "Stroke" ? <StrokeControls /> : group === "Advanced" ? <OptimizeControls /> : null;
+        const extra = group === "Stroke" ? <StrokeControls /> : group === "Advanced" ? <OptimizeControls />
+          : group === "Image" && algo.inputs ? <ImageInputs inputs={algo.inputs} /> : null;
         if (!defs.length && !extra) return null;
         return (
           <Section key={group} title={group} defaultOpen={group !== "Advanced"}>
             {(group === "Density" || group === "Stroke") && spacingIssue && <Notice level="warning">{spacingIssue.message}</Notice>}
+            {group === "Image" && extra}
             {defs.map((d) => <ParamControl key={d.id} def={d} values={values} />)}
-            {extra}
+            {group !== "Image" && extra}
           </Section>
         );
       })}

@@ -6,7 +6,7 @@ import { DEFAULT_PAPER, type PaperSettings } from "../core/paper";
 import { DEFAULT_OPTIMIZE, type OptimizeOptions } from "../plotter/optimize";
 import { DEFAULT_PROFILE, type PlotterProfile } from "../plotter/profiles";
 
-export interface ViewOptions { grid: boolean; margins: boolean; pathViz: boolean }
+export interface ViewOptions { grid: boolean; margins: boolean; pathViz: boolean; reference: boolean }
 
 export interface SettingsState {
   algorithmId: string;
@@ -66,7 +66,7 @@ export const useSettings = create<SettingsState>()(
         strokeColor: "#000000",
         paperColor: "#ffffff",
         optimize: DEFAULT_OPTIMIZE,
-        view: { grid: false, margins: true, pathViz: false },
+        view: { grid: false, margins: true, pathViz: false, reference: false },
         auto: true,
 
         setAlgorithm: (id) => { if (getAlgorithm(id)) set({ algorithmId: id }); },
@@ -104,6 +104,7 @@ export const useSettings = create<SettingsState>()(
         s.paper = { ...DEFAULT_PAPER, ...s.paper };
         s.profile = { ...DEFAULT_PROFILE, ...s.profile };
         s.optimize = { ...DEFAULT_OPTIMIZE, ...s.optimize };
+        s.view = { ...current.view, ...s.view };
         return s;
       },
       partialize: (s) => ({

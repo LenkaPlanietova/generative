@@ -1,6 +1,9 @@
+import { adaptiveHatching } from "./adaptiveHatching";
 import { contourField } from "./contourField";
+import { contourPortrait } from "./contourPortrait";
 import { flowField } from "./flowField";
 import { harmonograph } from "./harmonograph";
+import { imageDisplacement } from "./imageDisplacement";
 import { guilloche } from "./guilloche";
 import { interference } from "./interference";
 import { lissajous } from "./lissajous";
@@ -8,14 +11,17 @@ import { moire } from "./moire";
 import { noiseFlow } from "./noiseFlow";
 import { radialGeometry } from "./radialGeometry";
 import { reactionDiffusion } from "./reactionDiffusion";
+import { redraw } from "./redraw";
 import { spirograph } from "./spirograph";
 import { topographic } from "./topographic";
 import type { GenerativeAlgorithm } from "./types";
 import { waveDistortion } from "./waveDistortion";
+import { wavePortrait } from "./wavePortrait";
 
 export const ALGORITHMS: GenerativeAlgorithm[] = [
   flowField, noiseFlow, contourField, topographic, waveDistortion, radialGeometry, spirograph, lissajous, harmonograph,
   moire, guilloche, interference, reactionDiffusion,
+  redraw, contourPortrait, wavePortrait, adaptiveHatching, imageDisplacement,
 ];
 
 export const getAlgorithm = (id: string): GenerativeAlgorithm | undefined => ALGORITHMS.find((a) => a.id === id);
@@ -40,7 +46,7 @@ export const LIBRARY: { category: string; items: { id: string; name: string; pha
     { id: "attractor", name: "Attractor Fields", phase: "later" }, { id: "reaction-diffusion", name: "Reaction-Diffusion Contours" },
   ] },
   { category: "Image-driven", items: [
-    { id: "wave-portrait", name: "Wave Portrait", phase: 4 }, { id: "contour-portrait", name: "Contour Portrait", phase: 4 },
-    { id: "hatching", name: "Adaptive Hatching", phase: 4 }, { id: "displacement", name: "Image Displacement", phase: 4 },
+    { id: "redraw", name: "Redraw" }, { id: "contour-portrait", name: "Contour Portrait" }, { id: "wave-portrait", name: "Wave Portrait" },
+    { id: "hatching", name: "Adaptive Hatching" }, { id: "displacement", name: "Image Displacement" },
   ] },
 ];

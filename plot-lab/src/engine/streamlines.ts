@@ -32,6 +32,16 @@ export interface StreamlineParams {
   /** No lines where tone is above this. */
   whiteCut: number;
   seed: number;
+  /**
+   * Required free space around a new seed, × spacing. Default min(0.95, 1.6 × clearance) as in the JS reference
+   * worker; the Python reference uses 1 (stricter: fewer, longer lines).
+   */
+  seedClearance?: number;
+  /**
+   * Self-collision scope. "line" (JS reference): the backward half also avoids the forward half.
+   * "half" (Python reference): each half only avoids its own older points — longer lines that may loop back.
+   */
+  selfCollision?: "line" | "half";
 }
 
 export interface StreamlineInput {
@@ -66,7 +76,7 @@ export function traceStreamlines(input: StreamlineInput): StreamlineResult {
 
   const toPx = 1 / mmPerPx;
   const dMin = p.darkestSpacing * toPx, dMax = Math.max(p.lightestSpacing, p.darkestSpacing + 0.05) * toPx;
-  const gam = p.gamma, ratio = p.clearance;
+  const gam = p.gamma, ratio = p.clearance, seedRatio = p.seedClearance ?? Math.min(0.95, ratio * 1.6), halfOnly = p.selfCollision === "half";
   const step = Math.max(0.25, dMin * p.stepSize);
   const minSteps = (p.minLength * toPx) / step, maxSteps = Math.max(10, (p.maxLength * toPx) / step);
   const cosTurn = Math.cos((p.maxTurn * Math.PI) / 180), white = p.whiteCut;
@@ -142,12 +152,13 @@ export function traceStreamlines(input: StreamlineInput): StreamlineResult {
   /** Trace both directions from a seed; null if the seed is blocked or the line is too short. */
   function line(x: number, y: number): Path | null {
     if (!inside(x, y) || S(tone, x, y) > white) return null;
-    if (hit(grid, x, y, sep(x, y) * Math.min(0.95, ratio * 1.6))) return null;
+    if (hit(grid, x, y, sep(x, y) * seedRatio)) return null;
     if (!dir(x, y, 0, 0)) return null;
     const d0x = dirx, d0y = diry;
     const own: Hash = [], f: number[] = [], b: number[] = [];
     march(x, y, d0x, d0y, own, f);
-    for (let k = skip * 2; k < f.length; k += 2) put(own, f[k], f[k + 1]);
+    if (halfOnly) own.length = 0;
+    else for (let k = skip * 2; k < f.length; k += 2) put(own, f[k], f[k + 1]);
     march(x, y, -d0x, -d0y, own, b);
     const n = (f.length + b.length) / 2 + 1;
     if (n < minSteps || n < 3) return null;

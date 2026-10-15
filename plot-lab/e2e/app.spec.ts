@@ -136,11 +136,12 @@ test("zoom with the + / − buttons and keys", async ({ page }) => {
 });
 
 test("every algorithm generates and passes export validation", async ({ page }) => {
-  test.setTimeout(240_000);
+  test.setTimeout(360_000);
   await page.goto("/");
   await ready(page);
   for (const name of ["Noise Flow", "Contour Field", "Topographic Fields", "Wave Distortion", "Radial Geometry", "Spirograph", "Lissajous Curves",
-    "Harmonograph", "Moiré", "Guilloché", "Interference", "Reaction-Diffusion", "Flow Field"]) {
+    "Harmonograph", "Moiré", "Guilloché", "Interference", "Reaction-Diffusion",
+    "Redraw", "Contour Portrait", "Wave Portrait", "Adaptive Hatching", "Image Displacement", "Flow Field"]) {
     await page.getByRole("button", { name: new RegExp(`^${name}`) }).click();
     await expect(page.locator("header")).toContainText(name);
     await expect.poll(async () => (await page.getByTestId("gen-status").innerText()).includes("Ready"), { timeout: 30_000 }).toBe(true);
@@ -155,4 +156,28 @@ test("every algorithm generates and passes export validation", async ({ page }) 
   // Pure-maths curves say when the seed has no effect.
   await page.getByRole("button", { name: /^Spirograph/ }).click();
   await expect(page.getByTestId("seed-unused")).toBeVisible();
+});
+
+test("import an image, redraw it and export", async ({ page }) => {
+  test.setTimeout(180_000);
+  await page.goto("/");
+  await ready(page);
+  await page.getByRole("button", { name: /^Redraw/ }).click();
+  await expect(page.getByTestId("image-photo")).toContainText("Built-in sample head");
+  await page.getByLabel("Load Image").setInputFiles(new URL("../reference/examples/source_lineart.png", import.meta.url).pathname);
+  await expect(page.getByTestId("image-photo")).toContainText("source_lineart.png");
+  await expect(page.getByTestId("image-photo")).toContainText("1133 × 1388 · 8-bit");
+  await expect.poll(async () => (await page.getByTestId("gen-status").innerText()).includes("Ready") && (await pathCount(page)) > 300, { timeout: 90_000 }).toBe(true);
+  await page.waitForTimeout(500);
+  await ready(page);
+  expect(await inkedPixels(page)).toBeGreaterThan(5_000);
+  // Reference overlay toggles on and off.
+  await page.getByRole("button", { name: "Show reference image" }).click();
+  await expect(page.getByRole("button", { name: "Show reference image" })).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "Export SVG" }).click();
+  await expect(page.getByRole("dialog").getByTestId("validation")).toContainText("All export checks passed");
+  await page.keyboard.press("Escape");
+  // Removing the image falls back to the sample.
+  await page.getByRole("button", { name: "Remove Image" }).click();
+  await expect(page.getByTestId("image-photo")).toContainText("Built-in sample head");
 });

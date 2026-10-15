@@ -1,8 +1,14 @@
-import { Expand, Frame, Grid3x3, Minus, Plus, Route, Scan, Shrink } from "lucide-react";
+import { Expand, Frame, Grid3x3, Image as ImageIcon, Minus, Plus, Route, Scan, Shrink } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { sheetFor } from "../../core/paper";
 import { drawPathOrder, pathsToPath2D } from "../../render/preview";
 import { useGeneration } from "../../store/generation";
+import { getAlgorithm } from "../../algorithms/registry";
+import { adjustFrom } from "../../image/params";
+import { sampleImages } from "../../image/sample";
+import { sampleImage } from "../../image/sampler";
+import { useImages } from "../../store/images";
+import { resolveParams } from "../../algorithms/types";
 import { useSettings } from "../../store/settings";
 import { IconButton } from "./ui";
 
@@ -16,6 +22,22 @@ export function Canvas() {
   const penWidth = useSettings((s) => s.penWidth), strokeColor = useSettings((s) => s.strokeColor), paperColor = useSettings((s) => s.paperColor);
   const geometry = useGeneration((s) => s.geometry), partial = useGeneration((s) => s.partial), status = useGeneration((s) => s.status);
   const sheet = useMemo(() => sheetFor(paper), [paper]);
+  const algo = getAlgorithm(useSettings((s) => s.algorithmId))!;
+  const rawParams = useSettings((s) => s.params[s.algorithmId]), photo = useImages((s) => s.photo);
+  const params = useMemo(() => resolveParams(algo, rawParams ?? {}), [algo, rawParams]);
+  const adjustKey = algo.inputs ? JSON.stringify(adjustFrom(params)) : "";
+  // The reference image exactly as the algorithm samples it (placement and tone adjustments), for the overlay.
+  const reference = useMemo(() => {
+    if (!algo.inputs || !view.reference) return null;
+    const img = photo ?? sampleImages().photo, a = sheet.area, cell = Math.max(a.width, a.height) / 600;
+    const W = Math.ceil(a.width / cell), H = Math.ceil(a.height / cell);
+    const data = sampleImage(img, a, { W, H, x0: a.x, y0: a.y, sx: cell, sy: cell }, JSON.parse(adjustKey), 1);
+    const id = new ImageData(W, H);
+    for (let i = 0; i < data.length; i++) { const v = data[i] * 255; id.data[i * 4] = id.data[i * 4 + 1] = id.data[i * 4 + 2] = v; id.data[i * 4 + 3] = 255; }
+    const oc = new OffscreenCanvas(W, H);
+    oc.getContext("2d")!.putImageData(id, 0, 0);
+    return { canvas: oc, x: a.x, y: a.y, w: W * cell, h: H * cell };
+  }, [algo.inputs, view.reference, photo, sheet, adjustKey]);
 
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [cam, setCam] = useState<Cam | null>(null);
@@ -78,6 +100,11 @@ export function Canvas() {
       ctx.strokeRect(a.x, a.y, a.width, a.height);
       ctx.setLineDash([]);
     }
+    if (reference) {
+      ctx.globalAlpha = 0.35;
+      ctx.drawImage(reference.canvas, reference.x, reference.y, reference.w, reference.h);
+      ctx.globalAlpha = 1;
+    }
     // Artwork at the real pen width (in mm), so density on screen matches the plot.
     if (view.pathViz && status !== "generating") drawPathOrder(ctx, showing, penWidth, px);
     else {
@@ -87,7 +114,7 @@ export function Canvas() {
       ctx.lineJoin = "round";
       ctx.stroke(path2d);
     }
-  }, [cam, size, sheet, view, penWidth, strokeColor, paperColor, path2d, showing, status]);
+  }, [cam, size, sheet, view, penWidth, strokeColor, paperColor, path2d, showing, status, reference]);
 
   // Wheel zoom around the cursor, drag to pan, double-click to fit.
   useEffect(() => {
@@ -160,6 +187,7 @@ export function Canvas() {
         <span className="mx-1 h-4 w-px bg-line" />
         <IconButton label="Margins" active={view.margins} onClick={() => setView({ margins: !view.margins })}><Frame size={14} /></IconButton>
         <IconButton label="Grid (10 mm)" active={view.grid} onClick={() => setView({ grid: !view.grid })}><Grid3x3 size={14} /></IconButton>
+        {algo.inputs && <IconButton label="Show reference image" active={view.reference} onClick={() => setView({ reference: !view.reference })}><ImageIcon size={14} /></IconButton>}
         <IconButton label="Path order and pen-up moves" active={view.pathViz} onClick={() => setView({ pathViz: !view.pathViz })}><Route size={14} /></IconButton>
         <span className="mx-1 h-4 w-px bg-line" />
         <IconButton label={fullscreen ? "Exit full screen" : "Full screen"}

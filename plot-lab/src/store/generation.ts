@@ -4,6 +4,8 @@ import type { PlotStats } from "../plotter/stats";
 import type { GenerateRequest } from "../pipeline";
 import type { WorkerRequest, WorkerResponse } from "../worker/protocol";
 import GenerateWorker from "../worker/generate.worker.ts?worker";
+import { getAlgorithm } from "../algorithms/registry";
+import { useImages } from "./images";
 import { currentParams, useSettings } from "./settings";
 
 export interface GenerationState {
@@ -27,12 +29,14 @@ export const useGeneration = create<GenerationState>()(() => ({
 let worker: Worker | null = null, job = 0, timer = 0;
 
 export function requestFromSettings(): GenerateRequest {
-  const s = useSettings.getState();
-  return { algorithmId: s.algorithmId, params: currentParams(s), seed: s.seed, paper: s.paper, optimize: s.optimize, profile: s.profile };
+  const s = useSettings.getState(), inputs = getAlgorithm(s.algorithmId)?.inputs, im = useImages.getState();
+  const images = inputs ? { photo: inputs.photo ? im.photo : undefined, depth: inputs.depth ? im.depth : undefined } : undefined;
+  return { algorithmId: s.algorithmId, params: currentParams(s), seed: s.seed, paper: s.paper, optimize: s.optimize, profile: s.profile, images };
 }
 
 /** The parts of a request that change the geometry (plotter speeds only change the statistics). */
-export const geometryKey = (r: GenerateRequest) => JSON.stringify([r.algorithmId, r.params, r.seed, r.paper, r.optimize]);
+export const geometryKey = (r: GenerateRequest) =>
+  JSON.stringify([r.algorithmId, r.params, r.seed, r.paper, r.optimize, r.images?.photo?.id, r.images?.depth?.id]);
 
 /** Start a generation now, cancelling any running one (the worker is terminated, not asked politely). */
 export function generateNow(): void {
@@ -78,10 +82,12 @@ export function loadThumbnails(ids: string[]): void {
 /** Regenerate whenever settings that affect geometry change (if Auto is on). */
 export function startAutoGenerate(): () => void {
   let last = geometryKey(requestFromSettings());
-  return useSettings.subscribe((s) => {
+  const check = () => {
     const next = geometryKey(requestFromSettings());
     if (next === last) return;
     last = next;
-    if (s.auto) scheduleGenerate();
-  });
+    if (useSettings.getState().auto) scheduleGenerate();
+  };
+  const a = useSettings.subscribe(check), b = useImages.subscribe(check);
+  return () => { a(); b(); };
 }
