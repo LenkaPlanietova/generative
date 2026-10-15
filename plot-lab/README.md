@@ -3,12 +3,13 @@
 Generative art and pen-plotter studio. Algorithms generate real vector geometry in millimetres; the preview,
 SVG exporter, plotter optimiser and statistics all consume the same geometry.
 
-**Status: Phase 4** (image-driven art). Phase 1 delivered the app, geometry system, Flow Field, seeds, paper
+**Status: Phase 5** (professional workflow). Phase 1 delivered the app, geometry system, Flow Field, seeds, paper
 sizes, preview and validated SVG export. Phase 2 added Contour Field, Wave Distortion, Radial Geometry, Spirograph,
 Lissajous Curves and Harmonograph. Phase 3 adds Moiré, Guilloché, Interference, Reaction-Diffusion, advanced noise
 (ridged, billowed, domain-warped), Noise Flow and Topographic Fields. Phase 4 adds image import (16-bit PNG
 aware), a shared image sampler, Redraw (passes the SPEC_ADDENDUM acceptance test), Contour Portrait (the sculptural
-portrait engine), Wave Portrait, Adaptive Hatching and Image Displacement.
+portrait engine), Wave Portrait, Adaptive Hatching and Image Displacement. Phase 5 adds project files, presets, the
+variation explorer and clip to shape (SPEC_ADDENDUM §E).
 
 | Algorithm | How it works |
 |---|---|
@@ -51,6 +52,8 @@ npm run build
 | Plotter | `src/plotter/` | Optimiser (dedupe, short-path removal, RDP within tolerance, nearest-neighbour ordering with reversal), stats, ink density, plotter profiles. |
 | Export | `src/export/` | Hand-written SVG (mm size + viewBox, Inkscape layers, stroke only) and validation that blocks bad exports. |
 | Images | `src/image/` | PNG via fast-png at full bit depth (16-bit depth maps stay 16-bit), JPEG via the browser; one sampler for fit / scale / position (crop), brightness, contrast, invert and blur; built-in sample head. Images live in memory only. |
+| Projects | `src/project/` | JSON project files (format `plot-lab-project`, version 1): algorithm, parameters, seed, paper, stroke, plotter, optimisation, clip, and reference images embedded as PNG (16-bit kept). Parsing validates and clamps everything. Presets and recent projects live in local storage (`src/store/library.ts`). Variations: seeded new seeds and/or mutation of creative parameters (composition, image, quality and pen-safety spacing stay fixed). |
+| Clip | `src/geometry/clipShape.ts` | Circle / ellipse / rectangle, keep inside or outside; exact segment–shape intersections; optional outline layer. Runs in the pipeline before optimisation. |
 | Worker | `src/worker/`, `src/pipeline.ts` | Generate → stats → optimise → stats, off the main thread. Partial results stream to the preview; each change terminates and restarts the worker (300 ms debounce). |
 | UI | `src/app/`, `src/store/` | React + Zustand + Tailwind + Lucide. Settings persist to localStorage and are validated on load. |
 

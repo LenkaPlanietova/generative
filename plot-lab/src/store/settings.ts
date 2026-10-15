@@ -3,6 +3,7 @@ import { persist } from "zustand/middleware";
 import { ALGORITHMS, getAlgorithm } from "../algorithms/registry";
 import { type ParamValue, type ParamValues, defaultParams, resolveParams } from "../algorithms/types";
 import { DEFAULT_PAPER, type PaperSettings } from "../core/paper";
+import { type ClipSettings, DEFAULT_CLIP } from "../geometry/clipShape";
 import { DEFAULT_OPTIMIZE, type OptimizeOptions } from "../plotter/optimize";
 import { DEFAULT_PROFILE, type PlotterProfile } from "../plotter/profiles";
 
@@ -23,6 +24,8 @@ export interface SettingsState {
   optimize: OptimizeOptions;
   view: ViewOptions;
   auto: boolean;
+  projectName: string;
+  clip: ClipSettings;
 
   setAlgorithm(id: string): void;
   setParam(id: string, value: ParamValue): void;
@@ -39,6 +42,12 @@ export interface SettingsState {
   setOptimize(p: Partial<OptimizeOptions>): void;
   setView(p: Partial<ViewOptions>): void;
   setAuto(auto: boolean): void;
+  setClip(p: Partial<ClipSettings>): void;
+  setProjectName(name: string): void;
+  /** Replace the parameters of one algorithm (presets, variations, projects). */
+  setParams(algorithmId: string, params: ParamValues): void;
+  /** Start over: defaults for every algorithm, a fresh seed, no clip. Machine settings (profile, pen) are kept. */
+  newProject(): void;
 }
 
 export const MAX_SEED = 999_999;
@@ -68,6 +77,8 @@ export const useSettings = create<SettingsState>()(
         optimize: DEFAULT_OPTIMIZE,
         view: { grid: false, margins: true, pathViz: false, reference: false },
         auto: true,
+        projectName: "Untitled",
+        clip: DEFAULT_CLIP,
 
         setAlgorithm: (id) => { if (getAlgorithm(id)) set({ algorithmId: id }); },
         setParam: (id, value) => set((s) => ({ params: { ...s.params, [s.algorithmId]: { ...s.params[s.algorithmId], [id]: value } } })),
@@ -91,6 +102,17 @@ export const useSettings = create<SettingsState>()(
         setOptimize: (p) => set((s) => ({ optimize: { ...s.optimize, ...p } })),
         setView: (p) => set((s) => ({ view: { ...s.view, ...p } })),
         setAuto: (auto) => set({ auto }),
+        setClip: (p) => set((s) => ({ clip: { ...s.clip, ...p } })),
+        setProjectName: (projectName) => set({ projectName: projectName.slice(0, 120) }),
+        setParams: (algorithmId, params) => {
+          const a = getAlgorithm(algorithmId);
+          if (a) set((s) => ({ params: { ...s.params, [algorithmId]: resolveParams(a, params) } }));
+        },
+        newProject: () => set((s) => ({
+          algorithmId: ALGORITHMS[0].id,
+          params: Object.fromEntries(ALGORITHMS.map((a) => [a.id, defaultParams(a)])),
+          seed: freshSeed(), seedHistory: [], seedLocked: false, clip: DEFAULT_CLIP, projectName: "Untitled", paper: { ...DEFAULT_PAPER, ...{ paper: s.paper.paper, orientation: s.paper.orientation } },
+        })),
       };
     },
     {
@@ -105,12 +127,13 @@ export const useSettings = create<SettingsState>()(
         s.profile = { ...DEFAULT_PROFILE, ...s.profile };
         s.optimize = { ...DEFAULT_OPTIMIZE, ...s.optimize };
         s.view = { ...current.view, ...s.view };
+        s.clip = { ...DEFAULT_CLIP, ...s.clip };
         return s;
       },
       partialize: (s) => ({
         algorithmId: s.algorithmId, params: s.params, seed: s.seed, seedLocked: s.seedLocked, seedHistory: s.seedHistory,
         paper: s.paper, profile: s.profile, penWidth: s.penWidth, strokeColor: s.strokeColor, paperColor: s.paperColor,
-        optimize: s.optimize, view: s.view, auto: s.auto,
+        optimize: s.optimize, view: s.view, auto: s.auto, projectName: s.projectName, clip: s.clip,
       }),
     },
   ),

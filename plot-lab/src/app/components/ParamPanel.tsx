@@ -4,7 +4,9 @@ import { PARAM_GROUPS, type ParameterDefinition, type ParamValues } from "../../
 import { PAPER_NAMES, type PaperName, sheetFor } from "../../core/paper";
 import { penWarning } from "../../export/validate";
 import { MAX_SEED, currentParams, useSettings } from "../../store/settings";
+import { ClipControls } from "./ClipControls";
 import { ImageInputs } from "./ImageInputs";
+import { PresetControls } from "./PresetControls";
 import { ColorControl, IconButton, Notice, NumberControl, Section, SelectControl, ToggleControl } from "./ui";
 
 function SeedControls() {
@@ -102,11 +104,12 @@ export function ParamPanel() {
   return (
     <aside aria-label="Parameters" className="min-h-0 overflow-y-auto border-l border-line bg-panel">
       <Section title="Seed"><SeedControls /></Section>
+      <Section title="Presets" defaultOpen={false}><PresetControls /></Section>
       <Section title="Paper & plotter" defaultOpen={false}><PaperControls /></Section>
       {PARAM_GROUPS.map((group) => {
         const defs = algo.parameters.filter((p) => p.group === group && (!p.visibleWhen || p.visibleWhen(values)));
         const extra = group === "Stroke" ? <StrokeControls /> : group === "Advanced" ? <OptimizeControls />
-          : group === "Image" && algo.inputs ? <ImageInputs inputs={algo.inputs} /> : null;
+          : group === "Image" && algo.inputs ? <ImageInputs inputs={algo.inputs} /> : group === "Composition" ? <ClipControls /> : null;
         if (!defs.length && !extra) return null;
         return (
           <Section key={group} title={group} defaultOpen={group !== "Advanced"}>

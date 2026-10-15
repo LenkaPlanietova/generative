@@ -181,3 +181,78 @@ test("import an image, redraw it and export", async ({ page }) => {
   await page.getByRole("button", { name: "Remove Image" }).click();
   await expect(page.getByTestId("image-photo")).toContainText("Built-in sample head");
 });
+
+test("save a project, start a new one, and open the saved file again", async ({ page }) => {
+  await page.goto("/");
+  await ready(page);
+  await page.getByLabel("Project name").fill("Test piece");
+  await page.locator("#seed").fill("1234");
+  await page.locator('[data-control="noiseSize"] input[type="number"]').fill("90");
+  await page.locator('[data-control="noiseSize"] input[type="number"]').press("Enter");
+  await expect(page.getByTestId("stat-seed")).toHaveText(/\b1234$/);
+  await page.getByRole("button", { name: "Project" }).click();
+  const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("menuitem", { name: "Save project" }).click()]);
+  expect(download.suggestedFilename()).toBe("Test_piece.plotlab.json");
+  const file = (await download.path())!;
+
+  await page.getByRole("button", { name: "Project" }).click();
+  await page.getByRole("menuitem", { name: "New project" }).click();
+  await expect(page.getByLabel("Project name")).toHaveValue("Untitled");
+  await expect(page.getByTestId("stat-seed")).not.toHaveText(/\b1234$/);
+
+  await page.getByLabel("Open project file").setInputFiles(file);
+  await expect(page.getByLabel("Project name")).toHaveValue("Test piece");
+  await expect(page.getByTestId("stat-seed")).toHaveText(/\b1234$/);
+  await expect(page.locator('[data-control="noiseSize"] input[type="number"]')).toHaveValue("90");
+  // It is listed under Recent.
+  await page.getByRole("button", { name: "Project" }).click();
+  await expect(page.getByRole("menuitem", { name: /Test piece/ })).toBeVisible();
+});
+
+test("presets save and restore parameters", async ({ page }) => {
+  await page.goto("/");
+  await ready(page);
+  await page.getByRole("button", { name: "Presets" }).click();
+  await page.locator('[data-control="noiseSize"] input[type="number"]').fill("150");
+  await page.locator('[data-control="noiseSize"] input[type="number"]').press("Enter");
+  await page.getByLabel("New preset name").fill("Big swirls");
+  await page.getByRole("button", { name: "Save preset" }).click();
+  await page.locator('[data-control="noiseSize"] input[type="number"]').fill("20");
+  await page.locator('[data-control="noiseSize"] input[type="number"]').press("Enter");
+  await page.getByLabel("Preset", { exact: true }).selectOption({ label: "Big swirls" });
+  await page.getByRole("button", { name: "Apply" }).click();
+  await expect(page.locator('[data-control="noiseSize"] input[type="number"]')).toHaveValue("150");
+});
+
+test("variation explorer generates real variations and applies one", async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.goto("/");
+  await ready(page);
+  const seed = await page.getByTestId("stat-seed").innerText();
+  await page.getByRole("button", { name: "Variations" }).click();
+  const dialog = page.getByRole("dialog", { name: "Variations" });
+  await expect(dialog.getByTestId("variation")).toHaveCount(4);
+  await expect.poll(async () => (await dialog.getByTestId("variation-stats").allInnerTexts()).filter((t) => /paths/.test(t)).length, { timeout: 60_000 }).toBe(4);
+  await dialog.getByRole("group", { name: "Count" }).getByRole("button", { name: "9", exact: true }).click();
+  await expect(dialog.getByTestId("variation")).toHaveCount(9);
+  await dialog.getByRole("group", { name: "Count" }).getByRole("button", { name: "4", exact: true }).click();
+  await expect.poll(async () => (await dialog.getByTestId("variation-stats").allInnerTexts()).filter((t) => /paths/.test(t)).length, { timeout: 60_000 }).toBe(4);
+  await dialog.getByTestId("variation").nth(2).click();
+  await dialog.getByRole("button", { name: "Apply" }).click();
+  await expect(page.getByTestId("stat-seed")).not.toHaveText(seed);
+});
+
+test("clip to shape cuts the drawing and still exports cleanly", async ({ page }) => {
+  await page.goto("/");
+  await ready(page);
+  const before = await pathCount(page);
+  await page.getByRole("switch", { name: "Clip to shape" }).click();
+  await page.getByRole("switch", { name: "Draw outline (own layer)" }).click();
+  await expect.poll(async () => (await page.getByTestId("gen-status").innerText()).includes("Ready") && (await pathCount(page)) !== before, { timeout: 30_000 }).toBe(true);
+  await page.getByRole("button", { name: "Export SVG" }).click();
+  const dialog = page.getByRole("dialog", { name: "Export SVG" });
+  await expect(dialog.getByTestId("validation")).toContainText("All export checks passed");
+  const [download] = await Promise.all([page.waitForEvent("download"), dialog.getByRole("button", { name: "Download SVG" }).click()]);
+  const svg = await readFile((await download.path())!, "utf8");
+  expect(svg).toContain('inkscape:label="2 clip outline"');
+});
