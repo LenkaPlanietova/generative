@@ -1,10 +1,12 @@
-import type { FlowFieldParams } from "../algorithms/flowField";
-import type { PlotStats } from "../engine/order";
+import type { GenerateRequest, GenerateResult } from "../pipeline";
+import type { GeometryCollection, PlotPath } from "../geometry/types";
 
-export interface RunMessage { job: number; params: FlowFieldParams }
+export type WorkerRequest =
+  | ({ type: "generate"; job: number } & GenerateRequest)
+  | { type: "thumbnail"; job: number; algorithmId: string };
 
-export type WorkerMessage =
-  | { type: "fields"; job: number; tone: Float32Array; c: Float32Array; s: Float32Array; width: number; height: number; mmPerPx: number; ox: number; oy: number }
-  | { type: "batch"; job: number; paths: Float32Array[]; progress: number }
-  | { type: "done"; job: number; paths: Float32Array[]; before: PlotStats; after: PlotStats; ms: number }
+export type WorkerResponse =
+  | { type: "progress"; job: number; progress: number; partial: PlotPath[] }
+  | ({ type: "done"; job: number } & GenerateResult)
+  | { type: "thumbnail"; job: number; algorithmId: string; geometry: GeometryCollection }
   | { type: "error"; job: number; message: string };

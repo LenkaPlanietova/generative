@@ -27,29 +27,42 @@ function hash(ix: number, iy: number, seed: number): number {
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }
 
-/**
- * Gradient (Perlin-style) noise, roughly −1..1, `scale` in grid px. The lattice is rotated by `angle` so the
- * contours don't line up with the grid axes the way value noise does.
- */
-export function gradientNoise(W: number, H: number, scale: number, seed: number, angle = 0): Float32Array {
-  scale = Math.max(1, scale);
-  const ca = Math.cos(angle) / scale, sa = Math.sin(angle) / scale, out = new Float32Array(W * H);
+/** Point-sampled gradient (Perlin-style) noise, roughly −1..1 with unit feature size. Deterministic per seed. */
+export function perlin2(seed: number): (u: number, v: number) => number {
   const grad = (ix: number, iy: number, dx: number, dy: number) => {
     const a = hash(ix, iy, seed) * Math.PI * 2;
     return Math.cos(a) * dx + Math.sin(a) * dy;
   };
-  for (let y = 0; y < H; y++) {
-    for (let x = 0; x < W; x++) {
-      const u = x * ca - y * sa + 1000.5, v = x * sa + y * ca + 1000.5;
-      const x0 = Math.floor(u), y0 = Math.floor(v), tx = u - x0, ty = v - y0;
-      const sx = tx * tx * tx * (tx * (tx * 6 - 15) + 10), sy = ty * ty * ty * (ty * (ty * 6 - 15) + 10);
-      const a = grad(x0, y0, tx, ty), b = grad(x0 + 1, y0, tx - 1, ty);
-      const c = grad(x0, y0 + 1, tx, ty - 1), d = grad(x0 + 1, y0 + 1, tx - 1, ty - 1);
-      const top = a + (b - a) * sx;
-      out[y * W + x] = (top + (c + (d - c) * sx - top) * sy) * 1.4;
-    }
-  }
+  return (u, v) => {
+    u += 1000.5; v += 1000.5;
+    const x0 = Math.floor(u), y0 = Math.floor(v), tx = u - x0, ty = v - y0;
+    const sx = tx * tx * tx * (tx * (tx * 6 - 15) + 10), sy = ty * ty * ty * (ty * (ty * 6 - 15) + 10);
+    const a = grad(x0, y0, tx, ty), b = grad(x0 + 1, y0, tx - 1, ty);
+    const c = grad(x0, y0 + 1, tx, ty - 1), d = grad(x0 + 1, y0 + 1, tx - 1, ty - 1);
+    const top = a + (b - a) * sx;
+    return (top + (c + (d - c) * sx - top) * sy) * 1.4;
+  };
+}
+
+/**
+ * Gradient noise on a grid, `scale` in grid px. The lattice is rotated by `angle` so the contours don't line up
+ * with the grid axes the way value noise does.
+ */
+export function gradientNoise(W: number, H: number, scale: number, seed: number, angle = 0): Float32Array {
+  scale = Math.max(1, scale);
+  const ca = Math.cos(angle) / scale, sa = Math.sin(angle) / scale, out = new Float32Array(W * H), n = perlin2(seed);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) out[y * W + x] = n(x * ca - y * sa, x * sa + y * ca);
   return out;
+}
+
+/** Fractal sum of `octaves` gradient-noise layers (each half the size and amplitude), roughly −1..1. */
+export function fbm2(seed: number, octaves: number): (u: number, v: number) => number {
+  const layers = Array.from({ length: Math.max(1, Math.round(octaves)) }, (_, k) => perlin2(seed * 31 + 7 + k));
+  return (u, v) => {
+    let s = 0, amp = 1, f = 1, norm = 0;
+    for (let k = 0; k < layers.length; k++) { s += layers[k](u * f + k * 17.3, v * f - k * 9.1) * amp; norm += amp; amp *= 0.5; f *= 2; }
+    return s / norm;
+  };
 }
 
 export interface NoiseHeightOptions {

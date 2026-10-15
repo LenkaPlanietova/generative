@@ -43,6 +43,10 @@ export interface StreamlineInput {
   onBatch?: (lines: Path[], progress: number) => void;
   batchMs?: number;
   now?: () => number;
+  /** Safety limit: stop after this many lines. */
+  maxLines?: number;
+  /** Polled between lines; returning true stops tracing early. */
+  shouldStop?: () => boolean;
 }
 
 export interface StreamlineResult {
@@ -187,7 +191,8 @@ export function traceStreamlines(input: StreamlineInput): StreamlineResult {
   cand.sort((a, b) => a[0] - b[0]);
 
   let ci = 0, lastPost = now();
-  while (true) {
+  const maxLines = input.maxLines ?? Infinity, shouldStop = input.shouldStop;
+  while (lines.length < maxLines && !shouldStop?.()) {
     if (qh < queue.length) {
       const x = queue[qh++], y = queue[qh++];
       const L = line(x, y);

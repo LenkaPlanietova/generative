@@ -9,6 +9,7 @@ export const PAPER_PRESETS = {
 } as const satisfies Record<string, readonly [number, number]>;
 
 export type PaperName = keyof typeof PAPER_PRESETS | "Custom";
+export const PAPER_NAMES: PaperName[] = ["A5", "A4", "A3", "A2", "Square", "Custom"];
 
 export interface PaperSettings {
   paper: PaperName;
@@ -17,6 +18,8 @@ export interface PaperSettings {
   orientation: "portrait" | "landscape";
   margin: number;
 }
+
+export const DEFAULT_PAPER: PaperSettings = { paper: "A4", customWidth: 300, customHeight: 300, orientation: "portrait", margin: 20 };
 
 export interface Sheet {
   width: number;

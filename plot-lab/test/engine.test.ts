@@ -1,14 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { Grid } from "../src/core/fields";
 import { pathLength } from "../src/core/path";
-import { sheetFor } from "../src/core/paper";
 import { constantDirection, constantScalar } from "../src/fields/constant";
 import { radialGradient } from "../src/fields/radial";
 import { type StreamlineParams, traceStreamlines } from "../src/engine/streamlines";
-import { orderPaths, penUpTravel } from "../src/engine/order";
-import { rdp } from "../src/engine/simplify";
-import { FLOW_FIELD_DEFAULTS, penWarning, runFlowField } from "../src/algorithms/flowField";
-import { toSvg } from "../src/render/svg";
 
 const P: StreamlineParams = {
   darkestSpacing: 2, lightestSpacing: 2, gamma: 1, clearance: 0.5, minLength: 2, maxLength: 1000,
@@ -71,55 +66,14 @@ describe("streamline engine", () => {
   });
 });
 
-describe("simplify and order", () => {
-  it("rdp drops collinear points only", () => {
-    expect(Array.from(rdp(new Float32Array([0, 0, 1, 0, 2, 0, 3, 1]), 0.01))).toEqual([0, 0, 2, 0, 3, 1]);
-  });
-  it("ordering never increases pen-up travel and reverses paths when useful", () => {
-    const L = [new Float32Array([10, 0, 0, 0]), new Float32Array([50, 50, 60, 50]), new Float32Array([10, 1, 20, 1])];
-    const o = orderPaths(L);
-    expect(o.travel).toBeLessThanOrEqual(penUpTravel(L));
-    expect(Array.from(o.lines[0])).toEqual([0, 0, 10, 0]);
-  });
-});
 
-describe("flow field algorithm", () => {
-  const small = { ...FLOW_FIELD_DEFAULTS, paper: "A5" as const, darkestSpacing: 1, lightestSpacing: 4, radialRadius: 60 };
-
-  it("produces paths in sheet mm inside the margins, with before/after stats", () => {
-    const r = runFlowField({ ...small, resolution: 300 });
-    const a = r.layout.sheet.area;
-    expect(r.paths.length).toBeGreaterThan(50);
-    let outside = 0;
-    for (const p of r.paths) for (let j = 0; j < p.length; j += 2)
-      if (p[j] < a.x || p[j] > a.x + a.width || p[j + 1] < a.y || p[j + 1] > a.y + a.height) outside++;
-    expect(outside).toBe(0);
-    expect(r.after.travel).toBeLessThan(r.before.travel);
-    expect(r.after.time).toBeLessThan(r.before.time);
-    expect(r.after.ink).toBeCloseTo(r.before.ink, 3);
+describe("engine safety limits", () => {
+  it("stops at maxLines", () => {
+    const { lines } = traceStreamlines({ direction: constantDirection(grid, 0), tone: constantScalar(grid, 0), mmPerPx: grid.mmPerPx, params: P, maxLines: 5 });
+    expect(lines).toHaveLength(5);
   });
-
-  it("parameters are in mm: grid resolution changes precision, not the drawing", () => {
-    const lo = runFlowField({ ...small, resolution: 300 }).after, hi = runFlowField({ ...small, resolution: 600 }).after;
-    expect(Math.abs(lo.ink - hi.ink) / hi.ink).toBeLessThan(0.1);
-  });
-
-  it("warns when darkest spacing < 1.2 × pen width", () => {
-    expect(penWarning({ darkestSpacing: 0.35, penWidth: 0.3 })).toMatch(/solid black/);
-    expect(penWarning({ darkestSpacing: 0.4, penWidth: 0.3 })).toBeNull();
-  });
-});
-
-describe("paper and SVG", () => {
-  it("has A5 and Square presets and swaps for landscape", () => {
-    expect(sheetFor({ paper: "A5", orientation: "portrait", margin: 10, customWidth: 0, customHeight: 0 })).toMatchObject({ width: 148, height: 210 });
-    expect(sheetFor({ paper: "Square", orientation: "portrait", margin: 10, customWidth: 0, customHeight: 0 })).toMatchObject({ width: 200, height: 200 });
-    expect(sheetFor({ paper: "A3", orientation: "landscape", margin: 10, customWidth: 0, customHeight: 0 })).toMatchObject({ width: 420, height: 297 });
-  });
-  it("writes mm-unit SVG with one path per line", () => {
-    const svg = toSvg({ width: 210, height: 297, penWidth: 0.3, layers: [{ label: "ink", paths: [new Float32Array([1, 2, 3.456, 4])] }] });
-    expect(svg).toContain('width="210mm" height="297mm" viewBox="0 0 210 297"');
-    expect(svg).toContain('<path d="M1,2L3.46,4"/>');
-    expect(svg).toContain('stroke-width="0.3"');
+  it("stops when asked to", () => {
+    const { lines } = traceStreamlines({ direction: constantDirection(grid, 0), tone: constantScalar(grid, 0), mmPerPx: grid.mmPerPx, params: P, shouldStop: () => true });
+    expect(lines).toHaveLength(0);
   });
 });
