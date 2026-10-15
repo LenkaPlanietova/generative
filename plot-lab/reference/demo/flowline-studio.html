@@ -1,0 +1,559 @@
+<title>Flowline Studio</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@400;500;600&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/upng-js/2.1.0/UPNG.min.js"></script>
+<style>
+/* Layout: plotter-software workbench — control rail on the left, the sheet of paper on a graphite table on the right */
+:root{
+  --bg:#e9ebee; --rail:#f7f8f9; --fg:#15171b; --muted:#5b6270; --line:#d3d7dd;
+  --accent:#2c43c4; --accent-ink:#ffffff; --table:#dde0e5; --chip:#eef0f3;
+  --font-ui:"IBM Plex Sans Condensed","Roboto Condensed","Arial Narrow",system-ui,sans-serif;
+  --font-num:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#111317; --rail:#181b20; --fg:#e5e7eb; --muted:#9aa1ad; --line:#2a2f37;
+  --accent:#8796ff; --accent-ink:#0d1020; --table:#0c0e11; --chip:#20242b; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111317; --rail:#181b20; --fg:#e5e7eb; --muted:#9aa1ad; --line:#2a2f37;
+  --accent:#8796ff; --accent-ink:#0d1020; --table:#0c0e11; --chip:#20242b; color-scheme:dark}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--font-ui);font-size:14px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px;box-sizing:border-box}
+*{box-sizing:border-box}
+.app{display:grid;grid-template-columns:330px minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);gap:12px;height:100%;min-height:560px}
+header{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px}
+h1{font-size:19px;font-weight:600;letter-spacing:.01em;margin:0;text-wrap:balance}
+h1 span{font-weight:400;color:var(--muted)}
+.status{font-family:var(--font-num);font-size:12px;color:var(--muted);flex:1;min-width:160px;font-variant-numeric:tabular-nums}
+.actions{display:flex;flex-wrap:wrap;gap:6px}
+button,.btn{font:500 13px var(--font-ui);border:1px solid var(--line);background:var(--rail);color:var(--fg);
+  padding:7px 12px;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+button:hover,.btn:hover{border-color:var(--muted)}
+button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible,.btn:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+button:disabled{opacity:.45;cursor:default}
+.rail{background:var(--rail);border:1px solid var(--line);border-radius:10px;overflow-y:auto;min-height:0}
+details{border-bottom:1px solid var(--line)}
+details:last-child{border-bottom:0}
+summary{list-style:none;cursor:pointer;padding:11px 14px;font-weight:600;font-size:12px;letter-spacing:.08em;text-transform:uppercase;display:flex;justify-content:space-between;align-items:center}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"+";font-family:var(--font-num);color:var(--muted);font-weight:400}
+details[open] summary::after{content:"–"}
+.group{padding:0 14px 12px;display:grid;gap:10px}
+.ctl{display:grid;grid-template-columns:1fr auto;gap:3px 8px;align-items:center}
+.ctl label{color:var(--muted);font-size:13px;cursor:default;user-select:none}
+.ctl label[title]{cursor:help}
+.ctl output,.ctl .val{font-family:var(--font-num);font-size:12px;font-variant-numeric:tabular-nums;color:var(--fg);min-width:64px;text-align:right}
+.ctl input[type=range]{grid-column:1/-1;width:100%;accent-color:var(--accent);margin:0;height:18px}
+.ctl select,.ctl input[type=color]{font:13px var(--font-ui);background:var(--chip);color:var(--fg);border:1px solid var(--line);border-radius:5px;padding:4px 6px}
+.ctl input[type=color]{padding:1px;width:44px;height:26px}
+.check{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px}
+.check input{accent-color:var(--accent)}
+.src{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.drop{border:1px dashed var(--line);border-radius:8px;padding:8px;display:grid;gap:6px;justify-items:center;text-align:center;font-size:12px;color:var(--muted);cursor:pointer;position:relative;background:var(--chip)}
+.drop:hover,.drop.over{border-color:var(--accent)}
+.drop canvas{width:100%;aspect-ratio:3/4;object-fit:contain;background:var(--table);border-radius:4px;max-width:100%}
+.drop b{color:var(--fg);font-weight:600;font-size:12px}
+.drop input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.note{font-size:12px;color:var(--muted);line-height:1.45;margin:0}
+.seg{display:grid;grid-template-columns:repeat(4,1fr);background:var(--chip);border:1px solid var(--line);border-radius:7px;padding:2px;gap:2px}
+.seg button{border:0;background:transparent;padding:6px 4px;font-size:12px;justify-content:center;border-radius:5px;color:var(--muted)}
+.seg button[aria-pressed=true]{background:var(--rail);color:var(--fg);box-shadow:0 0 0 1px var(--line)}
+.stage{background:var(--table);border-radius:10px;position:relative;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+.sheet-wrap{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:18px}
+#sheet{background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.18),0 8px 28px rgba(0,0,0,.14);max-width:100%;display:block}
+.statbar{display:flex;flex-wrap:wrap;gap:4px 18px;padding:8px 14px;border-top:1px solid var(--line);font-family:var(--font-num);font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;background:var(--rail)}
+.statbar b{color:var(--fg);font-weight:500}
+.bar{position:absolute;top:0;left:0;height:3px;background:var(--accent);width:0;transition:width .2s}
+.tag{font-family:var(--font-num);font-size:11px;padding:2px 6px;border-radius:4px;background:var(--chip);border:1px solid var(--line);color:var(--muted)}
+.toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:8px 14px;border-radius:6px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s;max-width:calc(100% - 32px)}
+.toast.on{opacity:1}
+@media (max-width:820px){
+  .app{grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto auto;height:auto}
+  .stage{order:1;height:72vh}
+  .rail{order:2;overflow:visible}
+}
+@media (prefers-reduced-motion:reduce){.bar,.toast{transition:none}}
+</style>
+
+<div class="app">
+  <header>
+    <h1>Flowline Studio <span>· depth-map contour portraits</span></h1>
+    <div class="status" id="status" aria-live="polite">Ready</div>
+    <div class="actions">
+      <label class="check" title="Regenerate automatically after every change"><input type="checkbox" id="auto" checked> Auto</label>
+      <button class="primary" id="go">Generate</button>
+      <button id="exportSvg">Export SVG</button>
+      <button id="exportPng">PNG</button>
+      <button id="copySvg">Copy SVG</button>
+    </div>
+  </header>
+
+  <aside class="rail" id="rail">
+    <details open>
+      <summary>Source</summary>
+      <div class="group">
+        <div class="src">
+          <div class="drop" id="dropPhoto"><canvas id="thumbPhoto" width="120" height="160"></canvas><b>Photo</b><span id="photoName">sample</span><input type="file" id="filePhoto" accept="image/*" aria-label="Load photo"></div>
+          <div class="drop" id="dropDepth"><canvas id="thumbDepth" width="120" height="160"></canvas><b>Depth map</b><span id="depthName">sample</span><input type="file" id="fileDepth" accept="image/*" aria-label="Load depth map"></div>
+        </div>
+        <p class="note">Photo sets light and dark (line spacing). Depth map sets line direction — use <span class="tag">depth_smooth_16bit.png</span>. No depth map? Lines follow the photo brightness instead.</p>
+        <div class="actions"><button id="useSample">Load sample</button><button id="clearDepth">Remove depth map</button></div>
+        <div>
+          <div class="note" style="margin-bottom:6px">Preview</div>
+          <div class="seg" role="group" aria-label="Preview mode">
+            <button data-view="lines" aria-pressed="true">Lines</button>
+            <button data-view="tone" aria-pressed="false">Tone</button>
+            <button data-view="depth" aria-pressed="false">Depth</button>
+            <button data-view="field" aria-pressed="false">Flow</button>
+          </div>
+        </div>
+      </div>
+    </details>
+    <div id="controls"></div>
+    <details>
+      <summary>Presets</summary>
+      <div class="group">
+        <p class="note">Double-click any setting name to reset it. Your last settings are remembered in this browser.</p>
+        <div class="actions">
+          <button id="savePreset">Save preset</button>
+          <label class="btn">Load preset<input type="file" id="loadPreset" accept=".json,application/json" hidden></label>
+          <button id="resetAll">Reset all</button>
+        </div>
+      </div>
+    </details>
+  </aside>
+
+  <main class="stage">
+    <div class="bar" id="bar"></div>
+    <div class="sheet-wrap" id="wrap"><canvas id="sheet" aria-label="Plot preview"></canvas></div>
+    <div class="statbar" id="stats"><span>—</span></div>
+  </main>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script type="text/worker" id="workerSrc">
+"use strict";
+let lastPost = 0;
+function clamp(v,a,b){return v<a?a:v>b?b:v}
+function boxes(sigma,n){const wI=Math.sqrt(12*sigma*sigma/n+1);let wl=Math.floor(wI);if(wl%2===0)wl--;const wu=wl+2;
+  const m=Math.round((12*sigma*sigma-n*wl*wl-4*n*wl-3*n)/(-4*wl-4));const r=[];for(let i=0;i<n;i++)r.push(((i<m?wl:wu)-1)/2);return r}
+function boxH(s,d,W,H,r){r=Math.round(r);if(r<1){d.set(s);return}const k=1/(2*r+1);
+  for(let y=0;y<H;y++){const o=y*W;let a=0;for(let i=-r-1;i<=r-1;i++)a+=s[o+clamp(i,0,W-1)];
+    for(let x=0;x<W;x++){a+=s[o+Math.min(x+r,W-1)]-s[o+Math.max(x-r-1,0)];d[o+x]=a*k}}}
+function boxV(s,d,W,H,r){r=Math.round(r);if(r<1){d.set(s);return}const k=1/(2*r+1);
+  for(let x=0;x<W;x++){let a=0;for(let i=-r-1;i<=r-1;i++)a+=s[clamp(i,0,H-1)*W+x];
+    for(let y=0;y<H;y++){a+=s[Math.min(y+r,H-1)*W+x]-s[Math.max(y-r-1,0)*W+x];d[y*W+x]=a*k}}}
+function blur(src,W,H,sigma){const a=Float32Array.from(src);if(sigma<0.35)return a;const b=new Float32Array(W*H);
+  for(const r of boxes(sigma,3)){boxH(a,b,W,H,r);boxV(b,a,W,H,r)}return a}
+function rng(seed){let s=seed>>>0||1;return()=>{s^=s<<13;s>>>=0;s^=s>>17;s^=s<<5;s>>>=0;return s/4294967296}}
+function valueNoise(W,H,scale,seed){
+  const R=rng(seed*7919+13),gw=Math.ceil(W/scale)+2,gh=Math.ceil(H/scale)+2,g=new Float32Array(gw*gh);
+  for(let i=0;i<g.length;i++)g[i]=R()*2-1;const out=new Float32Array(W*H);
+  for(let y=0;y<H;y++){const fy=y/scale,y0=Math.floor(fy),ty=fy-y0,sy=ty*ty*(3-2*ty);
+    for(let x=0;x<W;x++){const fx=x/scale,x0=Math.floor(fx),tx=fx-x0,sx=tx*tx*(3-2*tx);
+      const a=g[y0*gw+x0],b=g[y0*gw+x0+1],c=g[(y0+1)*gw+x0],d=g[(y0+1)*gw+x0+1];
+      out[y*W+x]=(a+(b-a)*sx)+((c+(d-c)*sx)-(a+(b-a)*sx))*sy}}return out}
+
+function tensor(d,W,H,sigma){
+  const b=blur(d,W,H,sigma),n=W*H,xx=new Float32Array(n),yy=new Float32Array(n),xy=new Float32Array(n);
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=y*W+x;
+    const gx=(b[y*W+Math.min(x+1,W-1)]-b[y*W+Math.max(x-1,0)])*.5;
+    const gy=(b[Math.min(y+1,H-1)*W+x]-b[Math.max(y-1,0)*W+x])*.5;
+    xx[i]=gx*gx;yy[i]=gy*gy;xy[i]=gx*gy}
+  const XX=blur(xx,W,H,sigma),YY=blur(yy,W,H,sigma),XY=blur(xy,W,H,sigma);
+  let m=0;for(let i=0;i<n;i++)m+=XX[i]+YY[i];m=m/n+1e-12;
+  for(let i=0;i<n;i++){XX[i]/=m;YY[i]/=m;XY[i]/=m}return[XX,YY,XY]}
+
+function fields(photo,depth,W,H,p){
+  const n=W*H;
+  // tone 0 = black ... 1 = white
+  const tb=blur(photo,W,H,p.toneBlur),tone=new Float32Array(n);
+  for(let i=0;i<n;i++){let t=(tb[i]-.5)*p.contrast+.5+p.brightness;t=clamp(t,0,1);if(p.invert)t=1-t;tone[i]=t}
+  // height used for direction
+  let h;
+  if(depth){h=new Float32Array(n);const r=p.relief;for(let i=0;i<n;i++)h[i]=depth[i]*(1-r)+photo[i]*r}
+  else h=Float32Array.from(photo);
+  const A=tensor(h,W,H,p.detail),B=tensor(h,W,H,p.flowSigma),gw=p.globalW;
+  const c=new Float32Array(n),s=new Float32Array(n);
+  const off=p.angle*Math.PI/90, co=Math.cos(off), so=Math.sin(off); // double-angle rotation
+  const noise=p.noise>0?valueNoise(W,H,p.noiseScale,p.seed):null, na=p.noise*Math.PI/90;
+  let mean=0;
+  for(let i=0;i<n;i++){
+    const xx=A[0][i]+gw*B[0][i],yy=A[1][i]+gw*B[1][i],xy=A[2][i]+gw*B[2][i];
+    let cc=-(xx-yy),ss=-2*xy;
+    let r=cc*co-ss*so;ss=cc*so+ss*co;cc=r;
+    if(noise){const a=noise[i]*na,ca=Math.cos(a),sa=Math.sin(a);r=cc*ca-ss*sa;ss=cc*sa+ss*ca;cc=r}
+    c[i]=cc;s[i]=ss;mean+=Math.hypot(cc,ss)}
+  mean/=n;const eps=mean*0.02;for(let i=0;i<n;i++)c[i]-=eps; // flat areas fall back to vertical lines
+  return{tone,c,s}}
+
+function trace(F,W,H,p,mmPerPx,onBatch){
+  const{tone,c,s}=F,toPx=1/mmPerPx;
+  const dMin=p.minSp*toPx,dMax=Math.max(p.maxSp,p.minSp+0.05)*toPx,gam=p.gamma,ratio=p.testRatio;
+  const step=Math.max(0.25,dMin*p.stepQ),minSteps=p.minLen*toPx/step,maxSteps=Math.max(10,p.maxLen*toPx/step);
+  const cosTurn=Math.cos(p.maxTurn*Math.PI/180),white=p.whiteCut;
+  const cell=dMax,gw=Math.ceil(W/cell)+2,gh=Math.ceil(H/cell)+2;
+  const grid=new Array(gw*gh);for(let i=0;i<grid.length;i++)grid[i]=[];
+  function S(a,x,y){x=clamp(x,0,W-1.001);y=clamp(y,0,H-1.001);const x0=x|0,y0=y|0,fx=x-x0,fy=y-y0,i=y0*W+x0;
+    return(a[i]*(1-fx)+a[i+1]*fx)*(1-fy)+(a[i+W]*(1-fx)+a[i+W+1]*fx)*fy}
+  const sep=(x,y)=>dMin+(dMax-dMin)*Math.pow(S(tone,x,y),gam);
+  let dirx=0,diry=0;
+  function dir(x,y,px,py){const cc=S(c,x,y),ss=S(s,x,y);if(cc*cc+ss*ss<1e-20)return false;
+    const th=.5*Math.atan2(ss,cc);let dx=Math.cos(th),dy=Math.sin(th);if(px*dx+py*dy<0){dx=-dx;dy=-dy}dirx=dx;diry=dy;return true}
+  const inside=(x,y)=>x>=1&&x<W-2&&y>=1&&y<H-2;
+  function hit(g,x,y,r){const gx=(x/cell)|0,gy=(y/cell)|0,r2=r*r;
+    for(let j=gy-1;j<=gy+1;j++){if(j<0||j>=gh)continue;for(let i=gx-1;i<=gx+1;i++){if(i<0||i>=gw)continue;
+      const a=g[j*gw+i];if(!a)continue;for(let k=0;k<a.length;k+=2){const dx=a[k]-x,dy=a[k+1]-y;if(dx*dx+dy*dy<r2)return true}}}return false}
+  function put(g,x,y){const k=((y/cell)|0)*gw+((x/cell)|0);(g[k]||(g[k]=[])).push(x,y)}
+  const skip=Math.ceil(2.5*dMax/step)+2;
+  function march(x,y,d0x,d0y,own,out){
+    let px=d0x,py=d0y;const pend=[];
+    for(let it=0;it<maxSteps;it++){
+      if(!dir(x,y,px,py))break;const ax=dirx,ay=diry;
+      if(!dir(x+ax*step*.5,y+ay*step*.5,ax,ay))break;const bx=dirx,by=diry;
+      if(bx*px+by*py<cosTurn)break;
+      const nx=x+bx*step,ny=y+by*step;
+      if(!inside(nx,ny))break;
+      if(S(tone,nx,ny)>white)break;
+      const r=sep(nx,ny)*ratio;
+      if(hit(grid,nx,ny,r)||hit(own,nx,ny,r))break;
+      out.push(nx,ny);pend.push(nx,ny);
+      if(pend.length>skip*2){put(own,pend[0],pend[1]);pend.splice(0,2)}
+      x=nx;y=ny;px=bx;py=by}
+  }
+  function line(x,y){
+    if(!inside(x,y)||S(tone,x,y)>white)return null;
+    if(hit(grid,x,y,sep(x,y)*Math.min(.95,ratio*1.6)))return null;
+    if(!dir(x,y,0,0))return null;const d0x=dirx,d0y=diry;
+    const own={},f=[],b=[];
+    march(x,y,d0x,d0y,own,f);
+    for(let k=skip*2;k<f.length;k+=2)put(own,f[k],f[k+1]);
+    march(x,y,-d0x,-d0y,own,b);
+    const n=(f.length+b.length)/2+1;if(n<minSteps||n<3)return null;
+    const pts=new Float32Array(n*2);let o=0;
+    for(let k=b.length-2;k>=0;k-=2){pts[o++]=b[k];pts[o++]=b[k+1]}
+    pts[o++]=x;pts[o++]=y;for(let k=0;k<f.length;k++)pts[o++]=f[k];
+    return pts}
+  const lines=[];let batch=[];
+  const queue=[];let qh=0;
+  function accept(pts){for(let k=0;k<pts.length;k+=2)put(grid,pts[k],pts[k+1]);lines.push(pts);batch.push(pts);
+    const stride=Math.max(1,Math.round(dMin/step));
+    for(let k=0;k<pts.length-2;k+=2*stride){const x=pts[k],y=pts[k+1],tx=pts[k+2]-x,ty=pts[k+3]-y,l=Math.hypot(tx,ty)||1,nx=-ty/l,ny=tx/l,d=sep(x,y);
+      queue.push(x+nx*d,y+ny*d,x-nx*d,y-ny*d)}}
+  // fallback seeds over the whole image
+  const R=rng(p.seed),g=Math.max(2,dMax*.9),cand=[];
+  for(let y=g/2;y<H;y+=g)for(let x=g/2;x<W;x+=g){const jx=x+(R()-.5)*g*.6,jy=y+(R()-.5)*g*.6;
+    let key;if(p.seedOrder==="dark")key=S(tone,jx,jy);else if(p.seedOrder==="center")key=Math.hypot(jx-W/2,jy-H/2);else key=R();
+    cand.push([key,jx,jy])}
+  cand.sort((a,b)=>a[0]-b[0]);let ci=0;
+  while(true){
+    let made=false;
+    if(qh<queue.length){const x=queue[qh++],y=queue[qh++];const L=line(x,y);if(L){accept(L);made=true}}
+    else{if(ci>=cand.length)break;const L=line(cand[ci][1],cand[ci][2]);ci++;if(L)accept(L)}
+    if(qh>200000){queue.splice(0,qh);qh=0}
+    const t=performance.now();if(t-lastPost>140){lastPost=t;onBatch(batch,ci/cand.length);batch=[]}
+  }
+  onBatch(batch,1);
+  return{lines,step}}
+
+function rdp(pts,tol){const n=pts.length/2;if(n<3)return pts;const keep=new Uint8Array(n);keep[0]=keep[n-1]=1;const st=[[0,n-1]],t2=tol*tol;
+  while(st.length){const[a,b]=st.pop();const ax=pts[a*2],ay=pts[a*2+1],bx=pts[b*2],by=pts[b*2+1],dx=bx-ax,dy=by-ay,L=dx*dx+dy*dy||1e-12;
+    let md=-1,mi=-1;for(let i=a+1;i<b;i++){const px=pts[i*2]-ax,py=pts[i*2+1]-ay,t=clamp((px*dx+py*dy)/L,0,1),ex=px-t*dx,ey=py-t*dy,d=ex*ex+ey*ey;if(d>md){md=d;mi=i}}
+    if(md>t2){keep[mi]=1;st.push([a,mi],[mi,b])}}
+  let m=0;for(let i=0;i<n;i++)if(keep[i])m++;const out=new Float32Array(m*2);let o=0;for(let i=0;i<n;i++)if(keep[i]){out[o++]=pts[i*2];out[o++]=pts[i*2+1]}return out}
+
+function order(lines){ // greedy nearest neighbour with reversal, to cut pen-up travel
+  const n=lines.length,used=new Uint8Array(n),out=[];let cx=0,cy=0,travel=0;
+  for(let k=0;k<n;k++){let best=-1,bd=Infinity,rev=false;
+    for(let i=0;i<n;i++){if(used[i])continue;const L=lines[i],m=L.length;
+      let d=(L[0]-cx)**2+(L[1]-cy)**2;if(d<bd){bd=d;best=i;rev=false}
+      d=(L[m-2]-cx)**2+(L[m-1]-cy)**2;if(d<bd){bd=d;best=i;rev=true}}
+    used[best]=1;let L=lines[best];
+    if(rev){const r=new Float32Array(L.length);for(let j=0;j<L.length;j+=2){r[j]=L[L.length-2-j];r[j+1]=L[L.length-1-j]}L=r}
+    travel+=Math.sqrt(bd);out.push(L);cx=L[L.length-2];cy=L[L.length-1]}
+  return{lines:out,travel}}
+
+self.onmessage=e=>{
+  const{photo,depth,W,H,p,mmPerPx,job}=e.data;
+  const t0=performance.now();
+  self.postMessage({type:"status",job,text:"Building flow field…"});
+  const F=fields(photo,depth,W,H,p);
+  self.postMessage({type:"fields",job,tone:F.tone,c:F.c,s:F.s});
+  const{lines}=trace(F,W,H,p,mmPerPx,(b,frac)=>{self.postMessage({type:"batch",job,lines:b,frac})});
+  self.postMessage({type:"status",job,text:"Optimising pen path…"});
+  const simple=lines.map(L=>rdp(L,0.08/mmPerPx));
+  const o=order(simple);
+  let ink=0;for(const L of o.lines)for(let j=2;j<L.length;j+=2)ink+=Math.hypot(L[j]-L[j-2],L[j+1]-L[j-1]);
+  self.postMessage({type:"done",job,lines:o.lines,ink:ink*mmPerPx,travel:o.travel*mmPerPx,ms:performance.now()-t0});
+};
+</script>
+
+<script>
+"use strict";
+const CONTROLS=[
+ {group:"Paper & pen",open:true,items:[
+  {id:"paper",type:"select",label:"Paper",def:"A3",options:[["A5","A5 · 148 × 210"],["A4","A4 · 210 × 297"],["A3","A3 · 297 × 420"],["A2","A2 · 420 × 594"],["50x70","50 × 70 cm"]]},
+  {id:"orient",type:"select",label:"Orientation",def:"portrait",options:[["portrait","Portrait"],["landscape","Landscape"]]},
+  {id:"margin",label:"Margin",min:0,max:80,step:1,def:25,unit:"mm"},
+  {id:"pen",label:"Pen width",min:0.1,max:1.5,step:0.05,def:0.4,unit:"mm",draw:true,tip:"Only changes the preview and the SVG stroke. Set it to your real pen so the preview matches the plot."},
+  {id:"ink",type:"color",label:"Ink colour",def:"#15171b",draw:true},
+ ]},
+ {group:"Tone",items:[
+  {id:"brightness",label:"Brightness",min:-0.5,max:0.5,step:0.01,def:0},
+  {id:"contrast",label:"Contrast",min:0.3,max:3,step:0.05,def:1.2},
+  {id:"gamma",label:"Gamma",min:0.3,max:3,step:0.05,def:1.3,tip:"Above 1 keeps more of the face light and airy, below 1 darkens everything."},
+  {id:"toneBlur",label:"Tone smoothing",min:0,max:8,step:0.25,def:1,unit:"px"},
+  {id:"whiteCut",label:"Highlight cut-off",min:0.5,max:1,step:0.01,def:0.97,tip:"Lines stop where the image is lighter than this, leaving open paper. 1.00 = lines everywhere."},
+  {id:"invert",type:"check",label:"Invert tones",def:false},
+ ]},
+ {group:"Line spacing",items:[
+  {id:"minSp",label:"Darkest spacing",min:0.2,max:4,step:0.05,def:0.7,unit:"mm",tip:"Gap between lines in the darkest areas. Close to your pen width = solid black."},
+  {id:"maxSp",label:"Lightest spacing",min:0.8,max:12,step:0.1,def:3.5,unit:"mm"},
+  {id:"testRatio",label:"Line clearance",min:0.2,max:1,step:0.01,def:0.5,unit:"×",tip:"How close a line may run to a neighbour before it stops. Low = long lines that crowd together, high = shorter, broken lines."},
+ ]},
+ {group:"Flow",items:[
+  {id:"detail",label:"Detail smoothing",min:0.5,max:16,step:0.25,def:4,unit:"px",tip:"Lower = lines react to small features (lips, eyelids). Higher = calmer, longer curves."},
+  {id:"flowSigma",label:"Swirl size",min:4,max:120,step:1,def:25,unit:"px"},
+  {id:"globalW",label:"Swirl strength",min:0,max:4,step:0.05,def:0.6,tip:"How much the big overall form steers the lines compared with the small details."},
+  {id:"relief",label:"Photo relief",min:0,max:1,step:0.01,def:0.3,tip:"Mixes photo brightness into the depth, so lines also wrap around eyebrows, lips and shadows."},
+  {id:"angle",label:"Direction",min:-90,max:90,step:1,def:0,unit:"°",tip:"0° = lines wrap around the form like contours. 90° = lines run down the slopes like rain."},
+  {id:"noise",label:"Wobble",min:0,max:90,step:1,def:0,unit:"°"},
+  {id:"noiseScale",label:"Wobble size",min:4,max:250,step:1,def:60,unit:"px"},
+ ]},
+ {group:"Lines",items:[
+  {id:"minLen",label:"Shortest line",min:0,max:40,step:0.5,def:8,unit:"mm"},
+  {id:"maxLen",label:"Longest line",min:20,max:3000,step:10,def:800,unit:"mm"},
+  {id:"maxTurn",label:"Max bend per step",min:5,max:90,step:1,def:35,unit:"°",tip:"Lines stop at sharp kinks (swirl centres). Raise it to let them curl tighter."},
+  {id:"stepQ",label:"Step size",min:0.1,max:1,step:0.05,def:0.35,unit:"×",tip:"Tracing step relative to darkest spacing. Smaller = smoother but slower."},
+  {id:"seedOrder",type:"select",label:"Start lines from",def:"dark",options:[["dark","Darkest areas"],["center","Centre outwards"],["random","Random"]]},
+  {id:"seed",label:"Seed",min:1,max:999,step:1,def:7},
+ ]},
+ {group:"Quality & plot",items:[
+  {id:"workPx",label:"Resolution",min:300,max:1600,step:50,def:800,unit:"px",tip:"Size of the calculation grid. Higher = finer detail, slower."},
+  {id:"speed",label:"Plot speed",min:5,max:150,step:1,def:30,unit:"mm/s",draw:true,tip:"Pen-down speed of your plotter. Used only for the time estimate."},
+ ]},
+];
+const DEFS={};CONTROLS.forEach(g=>g.items.forEach(c=>DEFS[c.id]=c.def));
+const PAPER={A5:[148,210],A4:[210,297],A3:[297,420],A2:[420,594],"50x70":[500,700]};
+let P=Object.assign({},DEFS);
+try{const s=JSON.parse(localStorage.getItem("flowline-settings")||"null");if(s)for(const k in s)if(k in DEFS)P[k]=s[k]}catch(e){}
+const $=id=>document.getElementById(id);
+const fmt=(c,v)=>{const d=c.step>=1?0:(Math.abs(c.step*10-Math.round(c.step*10))<1e-9?1:2);return (+v).toFixed(d)+(c.unit?" "+c.unit:"")};
+
+// ---------- build controls
+const host=$("controls");
+CONTROLS.forEach(g=>{
+  const d=document.createElement("details");if(g.open)d.open=true;
+  d.innerHTML=`<summary>${g.group}</summary><div class="group"></div>`;const box=d.querySelector(".group");
+  g.items.forEach(c=>{
+    const w=document.createElement("div");
+    if(c.type==="check"){w.className="check";w.innerHTML=`<input type="checkbox" id="c_${c.id}"><label for="c_${c.id}">${c.label}</label>`}
+    else{w.className="ctl";
+      const tip=c.tip?` title="${c.tip}"`:"";
+      let inner;
+      if(c.type==="select")inner=`<select id="c_${c.id}">${c.options.map(o=>`<option value="${o[0]}">${o[1]}</option>`).join("")}</select>`;
+      else if(c.type==="color")inner=`<input type="color" id="c_${c.id}">`;
+      else inner=`<output id="o_${c.id}"></output><input type="range" id="c_${c.id}" min="${c.min}" max="${c.max}" step="${c.step}" aria-label="${c.label}">`;
+      w.innerHTML=`<label for="c_${c.id}"${tip}>${c.label}</label>${inner}`;
+      w.querySelector("label").addEventListener("dblclick",()=>{P[c.id]=c.def;syncUI();changed(c)});
+    }
+    box.appendChild(w);
+    const el=w.querySelector("#c_"+c.id);
+    el.addEventListener("input",()=>{P[c.id]=c.type==="check"?el.checked:(c.type==="select"||c.type==="color")?el.value:+el.value;
+      if(!c.type)$("o_"+c.id).textContent=fmt(c,P[c.id]);changed(c)});
+  });
+  host.appendChild(d);
+});
+function syncUI(){CONTROLS.forEach(g=>g.items.forEach(c=>{const el=$("c_"+c.id);
+  if(c.type==="check")el.checked=!!P[c.id];else el.value=P[c.id];if(!c.type)$("o_"+c.id).textContent=fmt(c,P[c.id])}))}
+syncUI();
+let regenT=0;
+function changed(c){
+  try{localStorage.setItem("flowline-settings",JSON.stringify(P))}catch(e){}
+  if(c&&c.draw){draw();stats();return}
+  if($("auto").checked){clearTimeout(regenT);regenT=setTimeout(generate,350)}
+  else{setStatus("Settings changed — press Generate");draw()}
+}
+
+// ---------- source images
+const SRC={photo:null,depth:null,W:0,H:0,photoName:"sample",depthName:"sample",pw:0,ph:0,photoFull:null,depthFull:null,depthFullW:0,depthFullH:0};
+function resample(src,sw,sh,W,H){ // box-average downsample / bilinear upsample
+  const out=new Float32Array(W*H),fx=sw/W,fy=sh/H;
+  if(fx<=1&&fy<=1){for(let y=0;y<H;y++)for(let x=0;x<W;x++){let sx=Math.min(sw-1.001,(x+.5)*fx-.5),sy=Math.min(sh-1.001,(y+.5)*fy-.5);sx=Math.max(0,sx);sy=Math.max(0,sy);
+    const x0=sx|0,y0=sy|0,ax=sx-x0,ay=sy-y0,i=y0*sw+x0,x1=Math.min(x0+1,sw-1)-x0,y1=Math.min(y0+1,sh-1)-y0;
+    out[y*W+x]=(src[i]*(1-ax)+src[i+x1]*ax)*(1-ay)+(src[i+y1*sw]*(1-ax)+src[i+y1*sw+x1]*ax)*ay}return out}
+  for(let y=0;y<H;y++){const y0=Math.floor(y*fy),y1=Math.max(y0+1,Math.floor((y+1)*fy));
+    for(let x=0;x<W;x++){const x0=Math.floor(x*fx),x1=Math.max(x0+1,Math.floor((x+1)*fx));let a=0,n=0;
+      for(let j=y0;j<y1&&j<sh;j++)for(let i=x0;i<x1&&i<sw;i++){a+=src[j*sw+i];n++}out[y*W+x]=n?a/n:0}}return out}
+function grayFromBitmap(bmp,maxSide=2400){
+  const s=Math.min(1,maxSide/Math.max(bmp.width,bmp.height)),w=Math.round(bmp.width*s),h=Math.round(bmp.height*s);
+  const cv=typeof OffscreenCanvas!=="undefined"?new OffscreenCanvas(w,h):Object.assign(document.createElement("canvas"),{width:w,height:h});
+  const cx=cv.getContext("2d");cx.drawImage(bmp,0,0,w,h);const d=cx.getImageData(0,0,w,h).data,g=new Float32Array(w*h);
+  for(let i=0;i<w*h;i++)g[i]=(0.2126*d[i*4]+0.7152*d[i*4+1]+0.0722*d[i*4+2])/255;return{g,w,h}}
+async function readDepth(file){
+  const buf=await file.arrayBuffer();
+  try{ if(window.UPNG&&/png$/i.test(file.type||file.name)){const im=UPNG.decode(buf);
+    if(im.depth===16&&(im.ctype===0||im.ctype===4||im.ctype===2||im.ctype===6)&&!im.tabs?.acTL){
+      const ch={0:1,4:2,2:3,6:4}[im.ctype],w=im.width,h=im.height,d=new Uint8Array(im.data),g=new Float32Array(w*h),row=w*ch*2;
+      for(let y=0;y<h;y++)for(let x=0;x<w;x++){const o=y*row+x*ch*2;g[y*w+x]=((d[o]<<8)|d[o+1])/65535}
+      let mn=1,mx=0;for(const v of g){if(v<mn)mn=v;if(v>mx)mx=v}const r=mx-mn||1;for(let i=0;i<g.length;i++)g[i]=(g[i]-mn)/r;
+      return{g,w,h,bits:16}}}}catch(e){}
+  const bmp=await createImageBitmap(new Blob([buf]));const r=grayFromBitmap(bmp,2400);
+  let mn=1,mx=0;for(const v of r.g){if(v<mn)mn=v;if(v>mx)mx=v}const k=mx-mn||1;for(let i=0;i<r.g.length;i++)r.g[i]=(r.g[i]-mn)/k;
+  r.bits=8;return r}
+function thumb(id,g,w,h){const cv=$(id),cx=cv.getContext("2d");cx.clearRect(0,0,cv.width,cv.height);if(!g)return;
+  const s=Math.min(cv.width/w,cv.height/h),tw=Math.max(1,Math.round(w*s)),th=Math.max(1,Math.round(h*s)),t=resample(g,w,h,tw,th),im=cx.createImageData(tw,th);
+  for(let i=0;i<tw*th;i++){const v=t[i]*255;im.data[i*4]=im.data[i*4+1]=im.data[i*4+2]=v;im.data[i*4+3]=255}
+  cx.putImageData(im,Math.round((cv.width-tw)/2),Math.round((cv.height-th)/2))}
+function prepareGrid(){ // resample sources to the working grid
+  const s=P.workPx/Math.max(SRC.pw,SRC.ph);SRC.W=Math.max(16,Math.round(SRC.pw*s));SRC.H=Math.max(16,Math.round(SRC.ph*s));
+  SRC.photo=resample(SRC.photoFull,SRC.pw,SRC.ph,SRC.W,SRC.H);
+  SRC.depth=SRC.depthFull?resample(SRC.depthFull,SRC.depthFullW,SRC.depthFullH,SRC.W,SRC.H):null;
+  SRC.gridFor=P.workPx}
+
+function makeSample(){ // procedural bust: a head turned slightly, lit from the upper left
+  const w=600,h=800,dep=new Float32Array(w*h),ton=new Float32Array(w*h);ton.fill(1);
+  const G=(x,y,cx,cy,sx,sy)=>Math.exp(-(((x-cx)/sx)**2+((y-cy)/sy)**2));
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    const u=(x-300)/185,v=(y-360)/245;let d=0;const r=1-u*u-v*v;
+    if(r>0){d=Math.sqrt(r)*.75;
+      d+=.16*G(x,y,272,360,22,95)+.1*G(x,y,268,450,34,24);           // nose ridge + tip
+      d-=.11*G(x,y,210,320,48,24)+.11*G(x,y,350,320,48,24);           // eye sockets
+      d+=.05*G(x,y,272,525,58,15)+.04*G(x,y,272,553,46,13);           // lips
+      d+=.07*G(x,y,190,450,60,70)+.07*G(x,y,370,450,60,70);           // cheeks
+      d+=.05*G(x,y,272,255,120,40);}                                   // brow
+    const nu=(x-285)/95;if(y>520&&Math.abs(nu)<1)d=Math.max(d,Math.sqrt(1-nu*nu)*.45*Math.min(1,(y-520)/60)); // neck
+    dep[y*w+x]=d}
+  for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++){const i=y*w+x,d=dep[i];if(d<=0.001){ton[i]=1;continue}
+    const gx=(dep[i+1]-dep[i-1])*130,gy=(dep[i+w]-dep[i-w])*130,l=Math.hypot(gx,gy,1),nx=-gx/l,ny=-gy/l,nz=1/l;
+    const lam=Math.max(0,nx*-.62+ny*-.42+nz*.66);ton[i]=Math.min(1,.05+lam*.82)}
+  SRC.photoFull=ton;SRC.pw=w;SRC.ph=h;SRC.depthFull=dep;SRC.depthFullW=w;SRC.depthFullH=h;
+  SRC.photoName="sample form";SRC.depthName="sample form";
+  thumb("thumbPhoto",ton,w,h);thumb("thumbDepth",dep,w,h);$("photoName").textContent=SRC.photoName;$("depthName").textContent=SRC.depthName;
+  prepareGrid()}
+
+async function loadPhoto(file){
+  try{setStatus("Loading photo…");const bmp=await createImageBitmap(file);const r=grayFromBitmap(bmp,2400);
+    SRC.photoFull=r.g;SRC.pw=r.w;SRC.ph=r.h;SRC.photoName=file.name;
+    if(SRC.depthName==="sample form"){SRC.depthFull=null;SRC.depthName="none";thumb("thumbDepth",null)}
+    thumb("thumbPhoto",r.g,r.w,r.h);$("photoName").textContent=file.name;$("depthName").textContent=SRC.depthName;
+    prepareGrid();generate()}catch(e){setStatus("Couldn't read that photo. Try a JPG or PNG.")}}
+async function loadDepth(file){
+  try{setStatus("Loading depth map…");const r=await readDepth(file);
+    SRC.depthFull=r.g;SRC.depthFullW=r.w;SRC.depthFullH=r.h;SRC.depthName=`${file.name} · ${r.bits}-bit`;
+    if(SRC.photoName==="sample form"){SRC.photoFull=r.g.map(v=>.15+.8*v);SRC.pw=r.w;SRC.ph=r.h;SRC.photoName="depth only";$("photoName").textContent="none — load your photo";thumb("thumbPhoto",SRC.photoFull,r.w,r.h)}
+    const ar1=SRC.pw/SRC.ph,ar2=r.w/r.h;
+    thumb("thumbDepth",r.g,r.w,r.h);$("depthName").textContent=SRC.depthName;
+    prepareGrid();generate();
+    if(Math.abs(ar1-ar2)>0.02)toast("Depth map and photo have different proportions — they're stretched to fit. Use the same photo for both.")}
+  catch(e){setStatus("Couldn't read that depth map. Use the PNG from the depth notebook.")}}
+function bindDrop(dropId,inputId,fn){const d=$(dropId),i=$(inputId);
+  i.addEventListener("change",()=>{if(i.files[0])fn(i.files[0]);i.value=""});
+  ["dragenter","dragover"].forEach(t=>d.addEventListener(t,e=>{e.preventDefault();d.classList.add("over")}));
+  ["dragleave","drop"].forEach(t=>d.addEventListener(t,e=>{e.preventDefault();d.classList.remove("over")}));
+  d.addEventListener("drop",e=>{const f=e.dataTransfer.files[0];if(f)fn(f)})}
+bindDrop("dropPhoto","filePhoto",loadPhoto);bindDrop("dropDepth","fileDepth",loadDepth);
+$("useSample").onclick=()=>{makeSample();generate()};
+$("clearDepth").onclick=()=>{SRC.depthFull=null;SRC.depthName="none";$("depthName").textContent="none — using photo";thumb("thumbDepth",null);prepareGrid();generate()};
+
+// ---------- generation
+let worker=null,job=0,LINES=[],FINAL=null,FIELDS=null,info=null,progress=0;
+const wurl=URL.createObjectURL(new Blob([$("workerSrc").textContent],{type:"text/javascript"}));
+function layout(){
+  let[pw,ph]=PAPER[P.paper];if(P.orient==="landscape")[pw,ph]=[ph,pw];
+  const m=Math.min(P.margin,pw/2-5,ph/2-5),mmPerPx=Math.min((pw-2*m)/SRC.W,(ph-2*m)/SRC.H);
+  return{pw,ph,mmPerPx,ox:(pw-SRC.W*mmPerPx)/2,oy:(ph-SRC.H*mmPerPx)/2}}
+function generate(){
+  if(!SRC.photoFull)return;if(SRC.gridFor!==P.workPx)prepareGrid();
+  if(worker)worker.terminate();worker=new Worker(wurl);const my=++job;
+  LINES=[];FINAL=null;info=null;progress=0;draw();$("go").disabled=false;
+  const L=layout();
+  worker.onmessage=e=>{const m=e.data;if(m.job!==my)return;
+    if(m.type==="status")setStatus(m.text);
+    else if(m.type==="fields"){FIELDS={tone:m.tone,c:m.c,s:m.s};if(view!=="lines")draw();setStatus("Tracing lines…")}
+    else if(m.type==="batch"){progress=m.frac;LINES.push(...m.lines);drawBatch(m.lines);$("bar").style.width=(m.frac*100).toFixed(1)+"%";
+      setStatus(`Tracing… ${LINES.length.toLocaleString()} lines`)}
+    else if(m.type==="done"){FINAL=m.lines;LINES=m.lines;info=m;$("bar").style.width="0";draw();stats();
+      setStatus(`Done in ${(m.ms/1000).toFixed(1)} s`)}};
+  worker.onerror=()=>setStatus("Something went wrong while tracing. Try a lower resolution.");
+  setStatus("Starting…");stats();
+  worker.postMessage({photo:SRC.photo,depth:SRC.depth,W:SRC.W,H:SRC.H,p:P,mmPerPx:L.mmPerPx,job:my});
+}
+$("go").onclick=generate;
+
+// ---------- drawing
+const cv=$("sheet"),ctx=cv.getContext("2d");let view="lines",pxPerMm=1,L0=null;
+document.querySelectorAll(".seg button").forEach(b=>b.onclick=()=>{view=b.dataset.view;
+  document.querySelectorAll(".seg button").forEach(x=>x.setAttribute("aria-pressed",x===b));draw()});
+function fit(){
+  const L=layout(),wrap=$("wrap"),aw=wrap.clientWidth-36,ah=wrap.clientHeight-36;
+  const s=Math.max(.5,Math.min(aw/L.pw,ah/L.ph)),dpr=Math.min(window.devicePixelRatio||1,2.5);
+  cv.style.width=Math.floor(L.pw*s)+"px";cv.style.height=Math.floor(L.ph*s)+"px";
+  cv.width=Math.floor(L.pw*s*dpr);cv.height=Math.floor(L.ph*s*dpr);pxPerMm=s*dpr;L0=L}
+function strokeLines(c,lines,L,k,width,color){
+  c.strokeStyle=color;c.lineWidth=width;c.lineCap="round";c.lineJoin="round";c.beginPath();
+  const sx=L.mmPerPx*k,ox=L.ox*k,oy=L.oy*k;
+  for(const p of lines){c.moveTo(ox+p[0]*sx,oy+p[1]*sx);for(let j=2;j<p.length;j+=2)c.lineTo(ox+p[j]*sx,oy+p[j+1]*sx)}c.stroke()}
+function drawImg(arr,map){
+  const L=L0,W=SRC.W,H=SRC.H,im=new ImageData(W,H);
+  for(let i=0;i<W*H;i++){const v=map(arr[i]);im.data[i*4]=im.data[i*4+1]=im.data[i*4+2]=v;im.data[i*4+3]=255}
+  const t=document.createElement("canvas");t.width=W;t.height=H;t.getContext("2d").putImageData(im,0,0);
+  ctx.imageSmoothingEnabled=true;ctx.drawImage(t,L.ox*pxPerMm,L.oy*pxPerMm,W*L.mmPerPx*pxPerMm,H*L.mmPerPx*pxPerMm)}
+function draw(){
+  if(!SRC.W)return;fit();ctx.fillStyle="#fff";ctx.fillRect(0,0,cv.width,cv.height);const L=L0;
+  if(view==="tone"){if(FIELDS)drawImg(FIELDS.tone,v=>v*255);else drawImg(SRC.photo,v=>v*255);return}
+  if(view==="depth"){if(SRC.depth)drawImg(SRC.depth,v=>v*255);else{drawImg(SRC.photo,v=>v*255)}return}
+  if(view==="field"){if(!FIELDS){return}
+    ctx.fillStyle="#fff";const W=SRC.W,H=SRC.H,step=Math.max(4,Math.round(Math.max(W,H)/70)),len=step*.42*L.mmPerPx*pxPerMm;
+    drawImg(FIELDS.tone,v=>235+v*20);ctx.strokeStyle="#2c43c4";ctx.lineWidth=Math.max(1,pxPerMm*.35);ctx.beginPath();
+    for(let y=step/2;y<H;y+=step)for(let x=step/2;x<W;x+=step){const i=(y|0)*W+(x|0),th=.5*Math.atan2(FIELDS.s[i],FIELDS.c[i]);
+      const cx=(L.ox+x*L.mmPerPx)*pxPerMm,cy=(L.oy+y*L.mmPerPx)*pxPerMm,dx=Math.cos(th)*len,dy=Math.sin(th)*len;ctx.moveTo(cx-dx,cy-dy);ctx.lineTo(cx+dx,cy+dy)}
+    ctx.stroke();return}
+  strokeLines(ctx,LINES,L,pxPerMm,Math.max(.6,P.pen*pxPerMm),P.ink)}
+function drawBatch(b){if(view!=="lines"||!L0)return;strokeLines(ctx,b,L0,pxPerMm,Math.max(.6,P.pen*pxPerMm),P.ink)}
+new ResizeObserver(()=>draw()).observe($("wrap"));
+
+// ---------- stats
+function stats(){
+  const el=$("stats");const L=layout();
+  if(!info){el.innerHTML=`<span>Sheet <b>${L.pw} × ${L.ph} mm</b></span><span>Grid <b>${SRC.W} × ${SRC.H}</b></span><span>Depth <b>${SRC.depth?"loaded":"from photo"}</b></span>`;return}
+  const secs=info.ink/P.speed+info.travel/(P.speed*2.5)+info.lines.length*0.35,h=Math.floor(secs/3600),m=Math.round((secs%3600)/60);
+  el.innerHTML=`<span>Lines <b>${info.lines.length.toLocaleString()}</b></span><span>Ink <b>${(info.ink/1000).toFixed(1)} m</b></span><span>Pen-up travel <b>${(info.travel/1000).toFixed(1)} m</b></span><span>Est. plot time <b>${h?h+" h ":""}${m} min</b></span><span>Sheet <b>${L.pw} × ${L.ph} mm</b></span>`}
+
+// ---------- export
+function svgText(){
+  const L=layout(),f=v=>(Math.round(v*100)/100).toString();const out=[];
+  out.push(`<?xml version="1.0" encoding="UTF-8"?>`,
+  `<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="${L.pw}mm" height="${L.ph}mm" viewBox="0 0 ${L.pw} ${L.ph}">`,
+  `<!-- Flowline Studio · ${JSON.stringify(P).replace(/--/g,"- -")} -->`,
+  `<g inkscape:groupmode="layer" inkscape:label="1 ink" fill="none" stroke="${P.ink}" stroke-width="${P.pen}" stroke-linecap="round" stroke-linejoin="round">`);
+  for(const p of FINAL){let d="M"+f(L.ox+p[0]*L.mmPerPx)+","+f(L.oy+p[1]*L.mmPerPx);
+    for(let j=2;j<p.length;j+=2)d+="L"+f(L.ox+p[j]*L.mmPerPx)+","+f(L.oy+p[j+1]*L.mmPerPx);out.push(`<path d="${d}"/>`)}
+  out.push(`</g>`,`</svg>`);return out.join("\n")}
+async function save(filename,data){
+  let d=null;try{if(window.claude&&window.claude.use)d=await window.claude.use("downloads")}catch(e){d=null}
+  if(d){try{await d.save({filename,data});toast("Saved "+filename)}catch(e){if(e&&e.code==="declined")toast("Download cancelled");else toast("Couldn't save the file here. Use Copy SVG instead.")}return}
+  try{const a=document.createElement("a");a.href=URL.createObjectURL(data instanceof Blob?data:new Blob([data]));a.download=filename;document.body.appendChild(a);a.click();a.remove();toast("Downloading "+filename)}
+  catch(e){toast("Downloads are blocked here. Use Copy SVG instead.")}}
+const base=()=>(SRC.photoName||"portrait").replace(/\.[a-z0-9]+$/i,"").replace(/[^\w-]+/g,"_")+"_"+P.paper;
+$("exportSvg").onclick=()=>{if(!FINAL){toast("Wait until tracing is done");return}save(base()+"_flowlines.svg",svgText())};
+$("copySvg").onclick=()=>{if(!FINAL){toast("Wait until tracing is done");return}
+  navigator.clipboard.writeText(svgText()).then(()=>toast("SVG copied — paste it into a .svg file")).catch(()=>toast("Copy was blocked in this view"))};
+$("exportPng").onclick=()=>{if(!FINAL){toast("Wait until tracing is done");return}
+  const L=layout(),k=8,c=document.createElement("canvas");c.width=Math.round(L.pw*k);c.height=Math.round(L.ph*k);const x=c.getContext("2d");
+  x.fillStyle="#fff";x.fillRect(0,0,c.width,c.height);strokeLines(x,FINAL,L,k,P.pen*k,P.ink);
+  c.toBlob(b=>save(base()+"_preview.png",b),"image/png")};
+$("savePreset").onclick=()=>save("flowline_preset.json",JSON.stringify(P,null,2));
+$("loadPreset").addEventListener("change",async e=>{const f=e.target.files[0];if(!f)return;
+  try{const s=JSON.parse(await f.text());for(const k in s)if(k in DEFS)P[k]=s[k];syncUI();changed();toast("Preset loaded")}catch(err){toast("That file isn't a Flowline preset")}e.target.value=""});
+$("resetAll").onclick=()=>{P=Object.assign({},DEFS);syncUI();changed()};
+
+// ---------- misc
+function setStatus(t){$("status").textContent=t}
+let tt;function toast(t){const el=$("toast");el.textContent=t;el.classList.add("on");clearTimeout(tt);tt=setTimeout(()=>el.classList.remove("on"),2600)}
+
+makeSample();generate();
+</script>

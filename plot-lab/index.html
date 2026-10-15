@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plot Lab</title>
+<link rel="stylesheet" href="./src/ui/style.css">
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>Plot Lab <span>· flow field</span></h1>
+    <div class="status" id="status" aria-live="polite">Ready</div>
+    <div class="actions">
+      <label class="check" title="Regenerate after every change"><input type="checkbox" id="auto" checked> Auto</label>
+      <button class="primary" id="go">Generate</button>
+      <button id="exportSvg">Export SVG</button>
+      <button id="copySvg">Copy SVG</button>
+    </div>
+  </header>
+  <aside class="rail">
+    <div class="viewseg" role="group" aria-label="Preview">
+      <button data-view="lines" aria-pressed="true">Lines</button>
+      <button data-view="tone" aria-pressed="false">Density</button>
+      <button data-view="field" aria-pressed="false">Flow</button>
+    </div>
+    <div id="warning" class="warning" hidden></div>
+    <div id="controls"></div>
+    <div class="group"><button id="resetAll">Reset all</button></div>
+  </aside>
+  <main class="stage">
+    <div class="bar" id="bar"></div>
+    <div class="sheet-wrap" id="wrap"><canvas id="sheet" aria-label="Plot preview"></canvas></div>
+    <div class="statbar" id="stats"></div>
+  </main>
+</div>
+<script type="module" src="./src/ui/main.ts"></script>
+</body>
+</html>
