@@ -133,9 +133,11 @@ test("zoom with the + / − buttons and keys", async ({ page }) => {
 });
 
 test("every algorithm generates and passes export validation", async ({ page }) => {
+  test.setTimeout(240_000);
   await page.goto("/");
   await ready(page);
-  for (const name of ["Contour Field", "Wave Distortion", "Radial Geometry", "Spirograph", "Lissajous Curves", "Harmonograph", "Flow Field"]) {
+  for (const name of ["Noise Flow", "Contour Field", "Topographic Fields", "Wave Distortion", "Radial Geometry", "Spirograph", "Lissajous Curves",
+    "Harmonograph", "Moiré", "Guilloché", "Interference", "Reaction-Diffusion", "Flow Field"]) {
     await page.getByRole("button", { name: new RegExp(`^${name}`) }).click();
     await expect(page.locator("header")).toContainText(name);
     await expect.poll(async () => (await page.getByTestId("gen-status").innerText()).includes("Ready"), { timeout: 30_000 }).toBe(true);

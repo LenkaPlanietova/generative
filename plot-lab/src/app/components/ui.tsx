@@ -56,7 +56,7 @@ export function NumberControl({ id, label, description, value, min, max, step, u
         {onReset && <ResetButton onClick={onReset} visible={defaultValue !== undefined && value !== defaultValue} />}
         <input id={`n-${id}`} type="number" value={text} min={min} max={max} step={step}
           onChange={(e) => setText(e.target.value)} onBlur={commit} onKeyDown={(e) => e.key === "Enter" && commit()}
-          className="w-16 rounded border border-line bg-bg px-1.5 py-0.5 text-right font-mono text-[12px] text-fg tabular-nums" />
+          className="w-[4.75rem] rounded border border-line bg-bg px-1.5 py-0.5 text-right font-mono text-[12px] text-fg tabular-nums" />
         {unit && <span className="w-14 truncate font-mono text-[11px] text-faint">{unit}</span>}
       </div>
       <input type="range" aria-label={label} value={value} min={min} max={max} step={step}

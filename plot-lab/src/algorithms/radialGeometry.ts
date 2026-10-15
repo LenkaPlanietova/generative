@@ -45,6 +45,7 @@ export const radialGeometry: GenerativeAlgorithm = {
   description: "Concentric rings and spirals in polar coordinates, with petals, twist and symmetry.",
   parameters,
   usesSeed: (v) => (v.noise as number) > 0,
+  seedHint: "Turn up Noise to use it.",
   async generate({ params, seed, paper }) {
     const v = resolveParams(radialGeometry, params), sheet = sheetOf(paper), a = sheet.area;
     const R = num(v, "radius"), r0 = Math.min(num(v, "innerRadius"), R), amp = num(v, "radialAmp"), freq = num(v, "angularFreq");

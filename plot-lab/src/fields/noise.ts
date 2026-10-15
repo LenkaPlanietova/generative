@@ -88,3 +88,35 @@ export function noiseHeight(grid: Grid, o: NoiseHeightOptions): ScalarField {
   for (let i = 0; i < out.length; i++) out[i] = (out[i] - mn) / r;
   return scalarField(grid, out);
 }
+
+export type NoiseType = "gradient" | "ridged" | "billow" | "warped";
+
+export const NOISE_TYPE_OPTIONS: { value: NoiseType; label: string }[] = [
+  { value: "gradient", label: "Smooth" },
+  { value: "ridged", label: "Ridged (sharp crests)" },
+  { value: "billow", label: "Billowed (puffy)" },
+  { value: "warped", label: "Domain-warped (marbled)" },
+];
+
+/**
+ * Advanced noise sampler, roughly −1..1 with unit feature size for the largest octave.
+ * ridged = 1 − |n| per octave (sharp crests), billow = |n| (rounded puffs),
+ * warped = fractal noise sampled at a position displaced by another fractal noise (marbled swirls).
+ */
+export function noiseSampler(type: NoiseType, seed: number, octaves: number, warp = 1): (u: number, v: number) => number {
+  const n = Math.max(1, Math.round(octaves));
+  const layers = Array.from({ length: n }, (_, k) => perlin2(seed * 31 + 7 + k));
+  const sum = (shape: (x: number) => number) => (u: number, v: number) => {
+    let s = 0, amp = 1, f = 1, norm = 0;
+    for (let k = 0; k < n; k++) { s += shape(layers[k](u * f + k * 17.3, v * f - k * 9.1)) * amp; norm += amp; amp *= 0.5; f *= 2; }
+    return s / norm;
+  };
+  if (type === "ridged") { const r = sum((x) => 1 - Math.abs(x)); return (u, v) => r(u, v) * 2 - 1; }
+  if (type === "billow") { const b = sum((x) => Math.abs(x)); return (u, v) => b(u, v) * 2 - 1; }
+  const base = sum((x) => x);
+  if (type === "warped") {
+    const wx = fbm2(seed * 7 + 101, n), wy = fbm2(seed * 7 + 202, n);
+    return (u, v) => base(u + warp * wx(u, v), v + warp * wy(u, v));
+  }
+  return base;
+}

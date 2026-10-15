@@ -26,7 +26,7 @@ function SeedControls() {
         <IconButton label="Restore previous seed" onClick={previousSeed} disabled={seedLocked || !seedHistory.length}><Undo2 size={13} /><span className="text-[12px]">Back</span></IconButton>
       </div>
       {!usesSeed && <p className="text-[11.5px] leading-snug text-faint" data-testid="seed-unused">
-        With these settings {algo.name} is exact maths, so the seed has no effect. Turn up Wobble, Noise or Detune to use it.
+        With these settings {algo.name} doesn't use the seed — the result is exact maths.{algo.seedHint ? ` ${algo.seedHint}` : ""}
       </p>}
     </div>
   );

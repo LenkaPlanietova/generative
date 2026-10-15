@@ -1,5 +1,8 @@
 import { type Sheet, type PaperSettings, sheetFor } from "../core/paper";
+import { marchingSquares } from "../fields/contours";
 import { perlin2 } from "../fields/noise";
+import type { Rect } from "../geometry/clip";
+import { chaikin } from "../geometry/shape";
 import { clipPolyline } from "../geometry/clip";
 import { DEFAULT_LAYER, type GeometryCollection, type Point } from "../geometry/types";
 import type { NumberParam, ParamValues } from "./types";
@@ -42,4 +45,32 @@ export function sample(n: number, t0: number, t1: number, f: (t: number) => Poin
   const pts: Point[] = new Array(n + 1);
   for (let i = 0; i <= n; i++) pts[i] = f(t0 + ((t1 - t0) * i) / n);
   return pts;
+}
+
+/**
+ * Contour lines of a grid field at each level, mapped onto the rectangle (grid corners on its corners) and
+ * smoothed with `smoothing` Chaikin passes. Returns one list of curves per level.
+ */
+export function traceLevels(data: Float32Array, W: number, H: number, levels: number[], r: Rect, smoothing: number): Curve[][] {
+  const sx = r.width / (W - 1), sy = r.height / (H - 1);
+  return levels.map((level) => marchingSquares(data, W, H, level).map((c) => ({
+    points: chaikin(c.points.map((p) => ({ x: r.x + p.x * sx, y: r.y + p.y * sy })), c.closed, smoothing),
+    closed: c.closed,
+  })));
+}
+
+/** A grid covering the rectangle with `resolution` cells along its long side; returns size and cell sizes. */
+export function gridOver(r: Rect, resolution: number): { W: number; H: number; sx: number; sy: number } {
+  const cell = Math.max(r.width, r.height) / resolution;
+  const W = Math.max(4, Math.round(r.width / cell) + 1), H = Math.max(4, Math.round(r.height / cell) + 1);
+  return { W, H, sx: r.width / (W - 1), sy: r.height / (H - 1) };
+}
+
+/** Several named layers (one SVG layer / pen each), every curve clipped to the drawing area. */
+export function toLayeredCollection(sheet: Sheet, layers: { id: string; name: string; curves: Curve[] }[]): GeometryCollection {
+  const paths: GeometryCollection["paths"] = [];
+  for (const l of layers)
+    for (const c of l.curves.flatMap((c) => clipPolyline(c.points, sheet.area, c.closed)))
+      if (c.points.length >= 2) paths.push({ id: `${l.id}-${paths.length}`, points: c.points, closed: c.closed, layerId: l.id });
+  return { widthMm: sheet.width, heightMm: sheet.height, layers: layers.map((l) => ({ id: l.id, name: l.name, stroke: "#000000" })), paths };
 }

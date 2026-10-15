@@ -3,9 +3,10 @@
 Generative art and pen-plotter studio. Algorithms generate real vector geometry in millimetres; the preview,
 SVG exporter, plotter optimiser and statistics all consume the same geometry.
 
-**Status: Phase 2** (generative library). Phase 1 delivered the app, geometry system, Flow Field, seeds, paper
-sizes, preview and validated SVG export. Phase 2 adds Contour Field, Wave Distortion, Radial Geometry, Spirograph,
-Lissajous Curves and Harmonograph.
+**Status: Phase 3** (advanced patterns). Phase 1 delivered the app, geometry system, Flow Field, seeds, paper
+sizes, preview and validated SVG export. Phase 2 added Contour Field, Wave Distortion, Radial Geometry, Spirograph,
+Lissajous Curves and Harmonograph. Phase 3 adds Moiré, Guilloché, Interference, Reaction-Diffusion, advanced noise
+(ridged, billowed, domain-warped), Noise Flow and Topographic Fields.
 
 | Algorithm | How it works |
 |---|---|
@@ -16,6 +17,12 @@ Lissajous Curves and Harmonograph.
 | Spirograph | Hypotrochoids / epitrochoids; closes automatically after r / gcd(R, r) turns. |
 | Lissajous Curves | x = A sin(at + δ), y = B sin(bt), with phase-stepped copies for ribbons. |
 | Harmonograph | Four damped oscillators (two per axis), optional seeded detune. |
+| Noise Flow | Noise-angle flow field (smooth, ridged, billowed or domain-warped noise) on the evenly spaced streamline engine. |
+| Topographic Fields | Contour map of advanced-noise terrain with a sea level; coastline and every Nth contour on a separate "index" layer. |
+| Moiré | Two to six line or ring systems with rotation, offset, waves and a lens; each system is its own SVG layer. |
+| Guilloché | Bands of phase-shifted closed rosettes r = R + A·env(θ)·sin(fθ + 2πk/n) that interlace into an engraved lattice. |
+| Interference | Sum of circular waves from point sources (circle, line or seeded positions), fringes traced as contours. |
+| Reaction-Diffusion | Gray-Scott simulation in the worker on a grid with physical cell size (safety limit 400 k cells), exported as contours only. |
 
 ```bash
 npm install

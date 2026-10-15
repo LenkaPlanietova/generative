@@ -17,6 +17,12 @@ const base = (a: GenerativeAlgorithm): ParamValues => {
   if (a.id === "contour") d.resolution = 200;
   if (a.id === "harmonograph") d.resolution = 40;
   if (a.id === "lissajous") d.resolution = 1500;
+  if (a.id === "reaction-diffusion") { d.iterations = 800; d.cellSize = 2; }
+  if (a.id === "noise-flow") { d.resolution = 250; d.lineSpacing = 3; }
+  if (a.id === "topographic") d.resolution = 160;
+  if (a.id === "interference") d.resolution = 240;
+  if (a.id === "guilloche") d.segment = 1;
+  if (a.id === "moire") d.step = 1.5;
   return d;
 };
 const run = (a: GenerativeAlgorithm, params: ParamValues, seed = 5, paper: PaperSettings = DEFAULT_PAPER) => a.generate({ params, seed, paper });

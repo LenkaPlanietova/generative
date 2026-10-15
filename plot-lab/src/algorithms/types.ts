@@ -55,6 +55,8 @@ export interface GenerativeAlgorithm {
   parameters: ParameterDefinition[];
   /** Whether the seed changes the result for these values (pure-maths curves ignore it unless wobble is on). */
   usesSeed?: (values: ParamValues) => boolean;
+  /** How to make the seed matter, shown when `usesSeed` is false. */
+  seedHint?: string;
   generate(settings: GenerationSettings): Promise<GeometryCollection>;
 }
 

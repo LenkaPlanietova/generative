@@ -16,9 +16,10 @@ export function Library() {
               const algo = getAlgorithm(item.id), selected = item.id === algorithmId;
               if (!algo) {
                 return (
-                  <li key={item.id} className="flex items-center justify-between px-3 py-1 text-faint" title={`Arrives in phase ${item.phase}`}>
+                  <li key={item.id} className="flex items-center justify-between px-3 py-1 text-faint"
+                    title={item.phase === "later" ? "Planned after the current roadmap" : `Arrives in phase ${item.phase}`}>
                     <span>{item.name}</span>
-                    <span className="font-mono text-[10px]">P{item.phase}</span>
+                    <span className="font-mono text-[10px]">{item.phase === "later" ? "later" : `P${item.phase}`}</span>
                   </li>
                 );
               }

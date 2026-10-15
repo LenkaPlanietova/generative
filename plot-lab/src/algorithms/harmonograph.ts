@@ -32,6 +32,7 @@ export const harmonograph: GenerativeAlgorithm = {
   description: "Damped harmonic oscillations of two pendulum pairs, one continuous line.",
   parameters,
   usesSeed: (v) => (v.detune as number) > 0 || (v.wobble as number) > 0,
+  seedHint: "Turn up Seeded detune or Wobble amount to use it.",
   async generate({ params, seed, paper }) {
     const v = resolveParams(harmonograph, params), sheet = sheetOf(paper), R = rng(seed);
     const det = num(v, "detune"), d = num(v, "damping"), T = num(v, "duration");
