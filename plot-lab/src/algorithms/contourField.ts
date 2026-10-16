@@ -4,10 +4,8 @@
  */
 import { blur } from "../core/blur";
 import { rng } from "../core/rng";
-import { marchingSquares } from "../fields/contours";
-import { fbm2 } from "../fields/noise";
-import { chaikin } from "../geometry/shape";
-import { type Curve, num, sheetOf, str, toCollection } from "./common";
+import { NOISE_TYPE_OPTIONS, type NoiseType, noiseSampler } from "../fields/noise";
+import { num, sheetOf, str, toCollection, traceLevels } from "./common";
 import { type GenerativeAlgorithm, type ParameterDefinition, type ParamValues, resolveParams } from "./types";
 
 const usesAttractors = (v: ParamValues) => v.source === "attractors" || v.source === "mixed";
@@ -41,6 +39,10 @@ const parameters: ParameterDefinition[] = [
     description: "Waves across the drawing area.", visibleWhen: (v) => v.source === "surface" },
   { id: "noiseStrength", type: "number", group: "Noise", label: "Noise strength", default: 0.35, min: 0, max: 1, step: 0.01,
     description: "How much noise is mixed into the field.", visibleWhen: (v) => v.source !== "noise" && v.source !== "attractors" },
+  { id: "noiseType", type: "select", group: "Noise", label: "Noise type", default: "gradient", options: NOISE_TYPE_OPTIONS,
+    description: "Character of the noise.", visibleWhen: (v) => v.source !== "attractors" },
+  { id: "warp", type: "number", group: "Noise", label: "Domain warp", default: 1, min: 0.1, max: 4, step: 0.05,
+    description: "How strongly the noise is swirled.", visibleWhen: (v) => v.source !== "attractors" && v.noiseType === "warped" },
   { id: "noiseScale", type: "number", group: "Noise", label: "Noise scale", default: 70, min: 5, max: 400, step: 1, unit: "mm",
     description: "Size of the largest noise features.", visibleWhen: (v) => v.source !== "attractors" },
   { id: "complexity", type: "number", group: "Noise", label: "Field complexity", default: 3, min: 1, max: 6, step: 1,
@@ -60,6 +62,7 @@ export const contourField: GenerativeAlgorithm = {
   description: "Topographic height lines of attractor, noise, radial or wave surfaces.",
   parameters,
   usesSeed: (v) => v.source === "attractors" || v.source === "noise" || (v.noiseStrength as number) > 0,
+  seedHint: "Mix in noise or use attractors to use it.",
   async generate({ params, seed, paper }) {
     const v = resolveParams(contourField, params), sheet = sheetOf(paper), a = sheet.area, source = str(v, "source");
     const cell = Math.max(a.width, a.height) / num(v, "resolution");
@@ -71,7 +74,7 @@ export const contourField: GenerativeAlgorithm = {
       x: a.width * (0.1 + 0.8 * R()), y: a.height * (0.1 + 0.8 * R()),
       s: num(v, "attractorSize") * (0.6 + 0.8 * R()), w: v.pits && R() < 0.3 ? -0.7 : 0.6 + 0.4 * R(),
     }));
-    const noise = fbm2(seed, num(v, "complexity")), ns = num(v, "noiseScale");
+    const noise = noiseSampler(str(v, "noiseType") as NoiseType, seed, num(v, "complexity"), num(v, "warp")), ns = num(v, "noiseScale");
     const nStr = source === "noise" ? 1 : source === "attractors" ? 0 : num(v, "noiseStrength");
     const cx = a.width / 2 + num(v, "centreX"), cy = a.height / 2 + num(v, "centreY"), maxR = Math.hypot(a.width, a.height) / 2;
     const f = (2 * Math.PI * num(v, "surfaceFreq")) / Math.max(a.width, a.height);
@@ -91,14 +94,8 @@ export const contourField: GenerativeAlgorithm = {
     for (const x of data) { if (x < lo) lo = x; if (x > hi) hi = x; }
     let t0 = num(v, "thresholdLow"), t1 = num(v, "thresholdHigh");
     if (t0 > t1) [t0, t1] = [t1, t0];
-    const n = num(v, "contourCount"), g = num(v, "spacing"), curves: Curve[] = [], iters = num(v, "curveSmoothing");
-    for (let k = 0; k < n; k++) {
-      const level = lo + (hi - lo) * (t0 + (t1 - t0) * ((k + 0.5) / n) ** g);
-      for (const c of marchingSquares(data, W, H, level)) {
-        const pts = c.points.map((p) => ({ x: a.x + p.x * sx, y: a.y + p.y * sy }));
-        curves.push({ points: chaikin(pts, c.closed, iters), closed: c.closed });
-      }
-    }
-    return toCollection(sheet, curves);
+    const n = num(v, "contourCount"), g = num(v, "spacing");
+    const levels = Array.from({ length: n }, (_, k) => lo + (hi - lo) * (t0 + (t1 - t0) * ((k + 0.5) / n) ** g));
+    return toCollection(sheet, traceLevels(data, W, H, levels, a, num(v, "curveSmoothing")).flat());
   },
 };

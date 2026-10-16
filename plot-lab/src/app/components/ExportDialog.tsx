@@ -13,7 +13,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
   const settings = useSettings();
   const { geometry, request, status } = useGeneration();
   const sheet = sheetFor(settings.paper), algo = getAlgorithm(settings.algorithmId)!;
-  const stale = !request || geometryKey(request) !== geometryKey(requestFromSettings());
+  const stale = !request || request.quality === "draft" || geometryKey(request) !== geometryKey(requestFromSettings());
   const [notice, setNotice] = useState("");
 
   const { svg, issues, stats } = useMemo(() => {
@@ -30,13 +30,20 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
     ];
     const pw = spacingDef && penWarning(currentParams(settings)[spacingDef.id] as number, settings.penWidth);
     if (pw) issues.push(pw);
-    if (stale) issues.unshift({ level: "error", code: "STALE", message: status === "generating" ? "Still generating — wait for it to finish." : "Settings changed since the last generation. Regenerate first." });
+    if (stale) issues.unshift({ level: "error", code: "STALE", message: status === "generating" || request?.quality === "draft" ? "Still generating the full-quality drawing — wait for it to finish." : "Settings changed since the last generation. Regenerate first." });
     return { svg, issues, stats };
   }, [geometry, settings, sheet, algo, stale, status]);
 
   const errors = issues.filter((i) => i.level === "error"), warnings = issues.filter((i) => i.level === "warning");
-  const url = useMemo(() => (svg ? URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" })) : ""), [svg]);
-  useEffect(() => () => { if (url) URL.revokeObjectURL(url); }, [url]);
+  // The preview URL is created and revoked inside one effect, so it is valid for exactly as long as it is shown
+  // (React StrictMode mounts effects twice in development; a URL made outside the effect would be revoked early).
+  const [url, setUrl] = useState("");
+  useEffect(() => {
+    if (!svg) { setUrl(""); return; }
+    const u = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
+    setUrl(u);
+    return () => URL.revokeObjectURL(u);
+  }, [svg]);
   useEffect(() => {
     const k = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", k);
@@ -45,11 +52,16 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
 
   const filename = `plotlab_${algo.id}_${settings.paper.paper}_seed${settings.seed}.svg`;
   const download = () => {
+    // A fresh URL for every download, released only after the browser has had time to start saving it.
+    const href = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
     const a = document.createElement("a");
-    a.href = url;
+    a.href = href;
     a.download = filename;
+    document.body.appendChild(a);
     a.click();
-    setNotice(`Saved ${filename}`);
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(href), 60_000);
+    setNotice(`Download started: ${filename} — check your Downloads folder`);
   };
 
   return (

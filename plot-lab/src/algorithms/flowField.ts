@@ -7,7 +7,7 @@ import type { Grid } from "../core/fields";
 import { gridToMm } from "../core/path";
 import { sheetFor } from "../core/paper";
 import { constantScalar } from "../fields/constant";
-import { noiseHeight } from "../fields/noise";
+import { NOISE_TYPE_OPTIONS, type NoiseType, noiseHeight, noiseSampler } from "../fields/noise";
 import { radialGradient } from "../fields/radial";
 import { directionFromHeight } from "../fields/structureTensor";
 import { type SeedOrder, traceStreamlines } from "../engine/streamlines";
@@ -41,6 +41,10 @@ const parameters: ParameterDefinition[] = [
   { id: "wobbleSize", type: "number", group: "Distortion", label: "Wobble size", default: 20, min: 2, max: 200, step: 1, unit: "mm",
     description: "Feature size of the wobble.", visibleWhen: (v) => (v.wobble as number) > 0 },
   // Noise
+  { id: "noiseType", type: "select", group: "Noise", label: "Noise type", default: "gradient", options: NOISE_TYPE_OPTIONS,
+    description: "Character of the noise terrain the lines follow." },
+  { id: "warp", type: "number", group: "Noise", label: "Domain warp", default: 1, min: 0.1, max: 4, step: 0.05,
+    description: "How strongly the terrain is swirled.", visibleWhen: (v) => v.noiseType === "warped" },
   { id: "noiseSize", type: "number", group: "Noise", label: "Noise scale", default: 60, min: 5, max: 400, step: 1, unit: "mm",
     description: "Size of the largest hills and valleys in the noise terrain." },
   { id: "noiseOctaves", type: "number", group: "Noise", label: "Noise detail", default: 2, min: 1, max: 5, step: 1,
@@ -83,6 +87,21 @@ const parameters: ParameterDefinition[] = [
     description: "Calculation grid along the long side. Changes precision and speed, not the drawing." },
 ];
 
+/** Height field (0..1) from a point sampler with feature size `size` mm. */
+function sampledHeight(grid: Grid, f: (u: number, v: number) => number, size: number) {
+  const { width: W, height: H, mmPerPx } = grid, data = new Float32Array(W * H), k = mmPerPx / size;
+  let lo = Infinity, hi = -Infinity;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const h = f(x * k, y * k);
+    data[y * W + x] = h;
+    if (h < lo) lo = h;
+    if (h > hi) hi = h;
+  }
+  const r = hi - lo || 1;
+  for (let i = 0; i < data.length; i++) data[i] = (data[i] - lo) / r;
+  return { width: W, height: H, data };
+}
+
 export const flowField: GenerativeAlgorithm = {
   id: "flow-field",
   name: "Flow Field",
@@ -90,12 +109,14 @@ export const flowField: GenerativeAlgorithm = {
   description: "Evenly spaced streamlines that follow the contours of a seeded noise terrain.",
   parameters,
   async generate({ params, seed, paper, onProgress, signal }): Promise<GeometryCollection> {
-    const p = resolveParams(flowField, params) as Record<string, number> & Record<"seedOrder" | "density", string>;
+    const p = resolveParams(flowField, params) as Record<string, number> & Record<"seedOrder" | "density" | "noiseType", string>;
     const sheet = sheetFor(paper), a = sheet.area;
     const mmPerPx = Math.max(a.width, a.height) / p.resolution;
     const grid: Grid = { width: Math.max(8, Math.round(a.width / mmPerPx)), height: Math.max(8, Math.round(a.height / mmPerPx)), mmPerPx };
 
-    const height = noiseHeight(grid, { size: p.noiseSize, octaves: p.noiseOctaves, seed });
+    const height = p.noiseType === "gradient"
+      ? noiseHeight(grid, { size: p.noiseSize, octaves: p.noiseOctaves, seed })
+      : sampledHeight(grid, noiseSampler(p.noiseType as NoiseType, seed, p.noiseOctaves, p.warp), p.noiseSize);
     const direction = directionFromHeight(height, grid, {
       detail: p.detail, swirlSize: p.swirlSize, swirlStrength: p.swirlStrength, offset: p.offset,
       wobble: p.wobble, wobbleSize: p.wobbleSize, seed,

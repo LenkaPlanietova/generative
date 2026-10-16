@@ -1,8 +1,9 @@
 import type { PaperSettings } from "../core/paper";
 import type { GeometryCollection, PlotPath } from "../geometry/types";
+import type { ImageInputs } from "../image/types";
 
-export type ParamGroup = "Structure" | "Geometry" | "Distortion" | "Noise" | "Density" | "Stroke" | "Composition" | "Advanced";
-export const PARAM_GROUPS: ParamGroup[] = ["Structure", "Geometry", "Distortion", "Noise", "Density", "Stroke", "Composition", "Advanced"];
+export type ParamGroup = "Image" | "Structure" | "Geometry" | "Distortion" | "Noise" | "Density" | "Stroke" | "Composition" | "Advanced";
+export const PARAM_GROUPS: ParamGroup[] = ["Image", "Structure", "Geometry", "Distortion", "Noise", "Density", "Stroke", "Composition", "Advanced"];
 
 export type ParamValue = number | boolean | string;
 export type ParamValues = Record<string, ParamValue>;
@@ -42,6 +43,8 @@ export interface GenerationSettings {
   params: ParamValues;
   seed: number;
   paper: PaperSettings;
+  /** Reference images for image-driven algorithms (the built-in sample is used when missing). */
+  images?: ImageInputs;
   /** Stream partial geometry (sheet mm) for live preview. */
   onProgress?: (progress: number, partial: PlotPath[]) => void;
   signal?: AbortSignal;
@@ -55,6 +58,10 @@ export interface GenerativeAlgorithm {
   parameters: ParameterDefinition[];
   /** Whether the seed changes the result for these values (pure-maths curves ignore it unless wobble is on). */
   usesSeed?: (values: ParamValues) => boolean;
+  /** Reference images this algorithm reads; the UI shows image import for these. */
+  inputs?: { photo?: boolean; depth?: boolean };
+  /** How to make the seed matter, shown when `usesSeed` is false. */
+  seedHint?: string;
   generate(settings: GenerationSettings): Promise<GeometryCollection>;
 }
 

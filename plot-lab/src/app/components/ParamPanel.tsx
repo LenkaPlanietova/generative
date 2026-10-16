@@ -4,6 +4,9 @@ import { PARAM_GROUPS, type ParameterDefinition, type ParamValues } from "../../
 import { PAPER_NAMES, type PaperName, sheetFor } from "../../core/paper";
 import { penWarning } from "../../export/validate";
 import { MAX_SEED, currentParams, useSettings } from "../../store/settings";
+import { ClipControls } from "./ClipControls";
+import { ImageInputs } from "./ImageInputs";
+import { PresetControls } from "./PresetControls";
 import { ColorControl, IconButton, Notice, NumberControl, Section, SelectControl, ToggleControl } from "./ui";
 
 function SeedControls() {
@@ -26,7 +29,7 @@ function SeedControls() {
         <IconButton label="Restore previous seed" onClick={previousSeed} disabled={seedLocked || !seedHistory.length}><Undo2 size={13} /><span className="text-[12px]">Back</span></IconButton>
       </div>
       {!usesSeed && <p className="text-[11.5px] leading-snug text-faint" data-testid="seed-unused">
-        With these settings {algo.name} is exact maths, so the seed has no effect. Turn up Wobble, Noise or Detune to use it.
+        With these settings {algo.name} doesn't use the seed — the result is exact maths.{algo.seedHint ? ` ${algo.seedHint}` : ""}
       </p>}
     </div>
   );
@@ -78,9 +81,16 @@ function OptimizeControls() {
       <div className="mt-1 border-t border-line pt-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-faint">Plotter optimisation</div>
       <ToggleControl id="order" label="Reorder paths" description="Nearest-neighbour ordering with reversal, to cut pen-up travel." value={optimize.order} onChange={(v) => setOptimize({ order: v })} />
       <NumberControl id="simplify" label="Simplify tolerance" description="Ramer–Douglas–Peucker. Points never move further than this. 0 = off." value={optimize.simplify} min={0} max={0.5} step={0.01} unit="mm" onChange={(v) => setOptimize({ simplify: v })} />
+      <SafetyControl />
       <NumberControl id="minPathLength" label="Remove paths under" description="Paths shorter than this are dropped. Zero-length paths are always dropped." value={optimize.minPathLength} min={0} max={10} step={0.1} unit="mm" onChange={(v) => setOptimize({ minPathLength: v })} />
     </>
   );
+}
+
+function SafetyControl() {
+  const maxPoints = useSettings((s) => s.maxPoints), setMaxPoints = useSettings((s) => s.setMaxPoints);
+  return <NumberControl id="maxPoints" label="Safety: max points" value={maxPoints} min={100_000} max={20_000_000} step={100_000}
+    description="Drawings with more points than this stop with a message instead of slowing everything down." onChange={setMaxPoints} />;
 }
 
 function ParamControl({ def, values }: { def: ParameterDefinition; values: ParamValues }) {
@@ -101,16 +111,19 @@ export function ParamPanel() {
   return (
     <aside aria-label="Parameters" className="min-h-0 overflow-y-auto border-l border-line bg-panel">
       <Section title="Seed"><SeedControls /></Section>
+      <Section title="Presets" defaultOpen={false}><PresetControls /></Section>
       <Section title="Paper & plotter" defaultOpen={false}><PaperControls /></Section>
       {PARAM_GROUPS.map((group) => {
         const defs = algo.parameters.filter((p) => p.group === group && (!p.visibleWhen || p.visibleWhen(values)));
-        const extra = group === "Stroke" ? <StrokeControls /> : group === "Advanced" ? <OptimizeControls /> : null;
+        const extra = group === "Stroke" ? <StrokeControls /> : group === "Advanced" ? <OptimizeControls />
+          : group === "Image" && algo.inputs ? <ImageInputs inputs={algo.inputs} /> : group === "Composition" ? <ClipControls /> : null;
         if (!defs.length && !extra) return null;
         return (
           <Section key={group} title={group} defaultOpen={group !== "Advanced"}>
             {(group === "Density" || group === "Stroke") && spacingIssue && <Notice level="warning">{spacingIssue.message}</Notice>}
+            {group === "Image" && extra}
             {defs.map((d) => <ParamControl key={d.id} def={d} values={values} />)}
-            {extra}
+            {group !== "Image" && extra}
           </Section>
         );
       })}

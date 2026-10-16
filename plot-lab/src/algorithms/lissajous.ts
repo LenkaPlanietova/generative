@@ -26,6 +26,7 @@ export const lissajous: GenerativeAlgorithm = {
   description: "Closed curves from two perpendicular sine oscillations.",
   parameters,
   usesSeed: (v) => (v.wobble as number) > 0,
+  seedHint: "Turn up Wobble amount to use it.",
   async generate({ params, seed, paper }) {
     const v = resolveParams(lissajous, params), sheet = sheetOf(paper);
     const a = num(v, "freqX"), b = num(v, "freqY"), A = num(v, "ampX"), B = num(v, "ampY"), n = num(v, "resolution");

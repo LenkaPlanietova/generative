@@ -43,6 +43,7 @@ export const waveDistortion: GenerativeAlgorithm = {
   description: "Parallel lines bent by layered sine waves and noise.",
   parameters,
   usesSeed: (v) => (v.noiseStrength as number) > 0,
+  seedHint: "Turn up Noise strength to use it.",
   async generate({ params, seed, paper }) {
     const v = resolveParams(waveDistortion, params), sheet = sheetOf(paper), a = sheet.area;
     const th = (num(v, "orientation") * Math.PI) / 180, ux = Math.cos(th), uy = Math.sin(th), nx = -uy, ny = ux;

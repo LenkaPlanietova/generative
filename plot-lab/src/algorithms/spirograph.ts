@@ -37,6 +37,7 @@ export const spirograph: GenerativeAlgorithm = {
   description: "Hypotrochoid and epitrochoid curves traced by a pen in a rolling wheel.",
   parameters,
   usesSeed: (v) => (v.wobble as number) > 0,
+  seedHint: "Turn up Wobble amount to use it.",
   async generate({ params, seed, paper }) {
     const v = resolveParams(spirograph, params), sheet = sheetOf(paper);
     const R = num(v, "fixedRadius"), r = num(v, "rollingRadius"), d = num(v, "penOffset"), epi = str(v, "type") === "epi";

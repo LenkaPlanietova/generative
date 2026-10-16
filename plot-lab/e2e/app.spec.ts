@@ -49,7 +49,10 @@ test("generate, adjust, vary, change paper, export a valid plotter SVG", async (
   await page.getByRole("button", { name: "Export SVG" }).click();
   const dialog = page.getByRole("dialog", { name: "Export SVG" });
   await expect(dialog.getByTestId("validation")).toContainText("All export checks passed");
+  // The preview image really loads (a revoked or broken blob URL leaves naturalWidth at 0).
+  await expect.poll(() => dialog.getByTestId("svg-preview").evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
   const [download] = await Promise.all([page.waitForEvent("download"), dialog.getByRole("button", { name: "Download SVG" }).click()]);
+  expect(await download.failure()).toBeNull();
   const svg = await readFile((await download.path())!, "utf8");
 
   // Parse, check, and render the exported file in the browser.
@@ -133,9 +136,12 @@ test("zoom with the + / − buttons and keys", async ({ page }) => {
 });
 
 test("every algorithm generates and passes export validation", async ({ page }) => {
+  test.setTimeout(360_000);
   await page.goto("/");
   await ready(page);
-  for (const name of ["Contour Field", "Wave Distortion", "Radial Geometry", "Spirograph", "Lissajous Curves", "Harmonograph", "Flow Field"]) {
+  for (const name of ["Noise Flow", "Contour Field", "Topographic Fields", "Wave Distortion", "Radial Geometry", "Spirograph", "Lissajous Curves",
+    "Harmonograph", "Moiré", "Guilloché", "Interference", "Reaction-Diffusion",
+    "Redraw", "Contour Portrait", "Wave Portrait", "Adaptive Hatching", "Image Displacement", "Flow Field"]) {
     await page.getByRole("button", { name: new RegExp(`^${name}`) }).click();
     await expect(page.locator("header")).toContainText(name);
     await expect.poll(async () => (await page.getByTestId("gen-status").innerText()).includes("Ready"), { timeout: 30_000 }).toBe(true);
@@ -150,4 +156,146 @@ test("every algorithm generates and passes export validation", async ({ page }) 
   // Pure-maths curves say when the seed has no effect.
   await page.getByRole("button", { name: /^Spirograph/ }).click();
   await expect(page.getByTestId("seed-unused")).toBeVisible();
+});
+
+test("import an image, redraw it and export", async ({ page }) => {
+  test.setTimeout(180_000);
+  await page.goto("/");
+  await ready(page);
+  await page.getByRole("button", { name: /^Redraw/ }).click();
+  await expect(page.getByTestId("image-photo")).toContainText("Built-in sample head");
+  await page.getByLabel("Load Image").setInputFiles(new URL("../reference/examples/source_lineart.png", import.meta.url).pathname);
+  await expect(page.getByTestId("image-photo")).toContainText("source_lineart.png");
+  await expect(page.getByTestId("image-photo")).toContainText("1133 × 1388 · 8-bit");
+  await expect.poll(async () => (await page.getByTestId("gen-status").innerText()).includes("Ready") && (await pathCount(page)) > 300, { timeout: 90_000 }).toBe(true);
+  await page.waitForTimeout(500);
+  await ready(page);
+  expect(await inkedPixels(page)).toBeGreaterThan(5_000);
+  // Reference overlay toggles on and off.
+  await page.getByRole("button", { name: "Show reference image" }).click();
+  await expect(page.getByRole("button", { name: "Show reference image" })).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "Export SVG" }).click();
+  await expect(page.getByRole("dialog").getByTestId("validation")).toContainText("All export checks passed");
+  await page.keyboard.press("Escape");
+  // Removing the image falls back to the sample.
+  await page.getByRole("button", { name: "Remove Image" }).click();
+  await expect(page.getByTestId("image-photo")).toContainText("Built-in sample head");
+});
+
+test("save a project, start a new one, and open the saved file again", async ({ page }) => {
+  await page.goto("/");
+  await ready(page);
+  await page.getByLabel("Project name").fill("Test piece");
+  await page.locator("#seed").fill("1234");
+  await page.locator('[data-control="noiseSize"] input[type="number"]').fill("90");
+  await page.locator('[data-control="noiseSize"] input[type="number"]').press("Enter");
+  await expect(page.getByTestId("stat-seed")).toHaveText(/\b1234$/);
+  await page.getByRole("button", { name: "Project" }).click();
+  const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("menuitem", { name: "Save project" }).click()]);
+  expect(download.suggestedFilename()).toBe("Test_piece.plotlab.json");
+  const file = (await download.path())!;
+
+  await page.getByRole("button", { name: "Project" }).click();
+  await page.getByRole("menuitem", { name: "New project" }).click();
+  await expect(page.getByLabel("Project name")).toHaveValue("Untitled");
+  await expect(page.getByTestId("stat-seed")).not.toHaveText(/\b1234$/);
+
+  await page.getByLabel("Open project file").setInputFiles(file);
+  await expect(page.getByLabel("Project name")).toHaveValue("Test piece");
+  await expect(page.getByTestId("stat-seed")).toHaveText(/\b1234$/);
+  await expect(page.locator('[data-control="noiseSize"] input[type="number"]')).toHaveValue("90");
+  // It is listed under Recent.
+  await page.getByRole("button", { name: "Project" }).click();
+  await expect(page.getByRole("menuitem", { name: /Test piece/ })).toBeVisible();
+});
+
+test("presets save and restore parameters", async ({ page }) => {
+  await page.goto("/");
+  await ready(page);
+  await page.getByRole("button", { name: "Presets" }).click();
+  await page.locator('[data-control="noiseSize"] input[type="number"]').fill("150");
+  await page.locator('[data-control="noiseSize"] input[type="number"]').press("Enter");
+  await page.getByLabel("New preset name").fill("Big swirls");
+  await page.getByRole("button", { name: "Save preset" }).click();
+  await page.locator('[data-control="noiseSize"] input[type="number"]').fill("20");
+  await page.locator('[data-control="noiseSize"] input[type="number"]').press("Enter");
+  await page.getByLabel("Preset", { exact: true }).selectOption({ label: "Big swirls" });
+  await page.getByRole("button", { name: "Apply" }).click();
+  await expect(page.locator('[data-control="noiseSize"] input[type="number"]')).toHaveValue("150");
+});
+
+test("variation explorer generates real variations and applies one", async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.goto("/");
+  await ready(page);
+  const seed = await page.getByTestId("stat-seed").innerText();
+  await page.getByRole("button", { name: "Variations" }).click();
+  const dialog = page.getByRole("dialog", { name: "Variations" });
+  await expect(dialog.getByTestId("variation")).toHaveCount(4);
+  await expect.poll(async () => (await dialog.getByTestId("variation-stats").allInnerTexts()).filter((t) => /paths/.test(t)).length, { timeout: 60_000 }).toBe(4);
+  await dialog.getByRole("group", { name: "Count" }).getByRole("button", { name: "9", exact: true }).click();
+  await expect(dialog.getByTestId("variation")).toHaveCount(9);
+  await dialog.getByRole("group", { name: "Count" }).getByRole("button", { name: "4", exact: true }).click();
+  await expect.poll(async () => (await dialog.getByTestId("variation-stats").allInnerTexts()).filter((t) => /paths/.test(t)).length, { timeout: 60_000 }).toBe(4);
+  await dialog.getByTestId("variation").nth(2).click();
+  await dialog.getByRole("button", { name: "Apply" }).click();
+  await expect(page.getByTestId("stat-seed")).not.toHaveText(seed);
+});
+
+test("clip to shape cuts the drawing and still exports cleanly", async ({ page }) => {
+  await page.goto("/");
+  await ready(page);
+  const before = await pathCount(page);
+  await page.getByRole("switch", { name: "Clip to shape" }).click();
+  await page.getByRole("switch", { name: "Draw outline (own layer)" }).click();
+  await expect.poll(async () => (await page.getByTestId("gen-status").innerText()).includes("Ready") && (await pathCount(page)) !== before, { timeout: 30_000 }).toBe(true);
+  await page.getByRole("button", { name: "Export SVG" }).click();
+  const dialog = page.getByRole("dialog", { name: "Export SVG" });
+  await expect(dialog.getByTestId("validation")).toContainText("All export checks passed");
+  const [download] = await Promise.all([page.waitForEvent("download"), dialog.getByRole("button", { name: "Download SVG" }).click()]);
+  const svg = await readFile((await download.path())!, "utf8");
+  expect(svg).toContain('inkscape:label="2 clip outline"');
+});
+
+test("a quick draft appears while adjusting, then the full-quality drawing", async ({ page }) => {
+  await page.goto("/");
+  await ready(page);
+  const seen: string[] = [];
+  const watch = setInterval(async () => { try { seen.push(await page.getByTestId("gen-status").innerText()); } catch { /* page closing */ } }, 40);
+  await page.locator('[data-control="noiseSize"] input[type="number"]').fill("95");
+  await page.locator('[data-control="noiseSize"] input[type="number"]').press("Enter");
+  await expect.poll(() => seen.some((t) => /Draft/.test(t)), { timeout: 10_000 }).toBe(true);
+  await expect(page.getByTestId("gen-status")).toContainText(/Ready · \d/, { timeout: 30_000 });
+  clearInterval(watch);
+  // Export is only offered for the full-quality drawing.
+  await page.getByRole("button", { name: "Export SVG" }).click();
+  await expect(page.getByRole("dialog").getByTestId("validation")).toContainText("All export checks passed");
+});
+
+test("returning to an earlier setting is served from the cache", async ({ page }) => {
+  await page.goto("/");
+  await ready(page);
+  await page.getByRole("button", { name: "Next variation (seed + 1)" }).click();
+  await expect(page.getByTestId("gen-status")).toContainText(/Ready · \d/, { timeout: 30_000 });
+  await page.getByRole("button", { name: "Restore previous seed" }).click();
+  await expect(page.getByTestId("gen-status")).toContainText("Ready · from cache", { timeout: 5_000 });
+});
+
+test("keyboard shortcuts", async ({ page }) => {
+  await page.goto("/");
+  await ready(page);
+  const seed = await page.getByTestId("stat-seed").innerText();
+  await page.locator("body").press("r");
+  await expect(page.getByTestId("stat-seed")).not.toHaveText(seed);
+  await page.locator("body").press("b");
+  await expect(page.getByTestId("stat-seed")).toHaveText(seed);
+  await page.locator("body").press("?");
+  await expect(page.getByRole("dialog", { name: "Keyboard shortcuts" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog", { name: "Keyboard shortcuts" })).toHaveCount(0);
+  const [download] = await Promise.all([page.waitForEvent("download"), page.keyboard.press("ControlOrMeta+s")]);
+  expect(download.suggestedFilename()).toMatch(/\.plotlab\.json$/);
+  // Typing in a field never triggers shortcuts.
+  await page.getByLabel("Project name").fill("rrr");
+  await expect(page.getByTestId("stat-seed")).toHaveText(seed);
 });

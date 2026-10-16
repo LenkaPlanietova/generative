@@ -18,7 +18,8 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
       const algo = getAlgorithm(m.algorithmId);
       if (!algo) throw new Error(`Unknown algorithm "${m.algorithmId}"`);
       // Real geometry, generated small with a coarse field.
-      const params = { ...defaultParams(algo), resolution: 250 };
+      // Coarser fields and a shorter simulation keep thumbnails quick; unknown keys are ignored per algorithm.
+      const params = { ...defaultParams(algo), resolution: 250, cellSize: 2.2, iterations: 2500, step: 0.5 };
       const g = await algo.generate({ params, seed: 1, paper: { paper: "Square", customWidth: 200, customHeight: 200, orientation: "portrait", margin: 10 } });
       post({ type: "thumbnail", job: m.job, algorithmId: m.algorithmId, geometry: optimize(g, { ...DEFAULT_OPTIMIZE, simplify: 0.3, order: false }) });
     }
