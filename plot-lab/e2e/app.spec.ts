@@ -256,3 +256,46 @@ test("clip to shape cuts the drawing and still exports cleanly", async ({ page }
   const svg = await readFile((await download.path())!, "utf8");
   expect(svg).toContain('inkscape:label="2 clip outline"');
 });
+
+test("a quick draft appears while adjusting, then the full-quality drawing", async ({ page }) => {
+  await page.goto("/");
+  await ready(page);
+  const seen: string[] = [];
+  const watch = setInterval(async () => { try { seen.push(await page.getByTestId("gen-status").innerText()); } catch { /* page closing */ } }, 40);
+  await page.locator('[data-control="noiseSize"] input[type="number"]').fill("95");
+  await page.locator('[data-control="noiseSize"] input[type="number"]').press("Enter");
+  await expect.poll(() => seen.some((t) => /Draft/.test(t)), { timeout: 10_000 }).toBe(true);
+  await expect(page.getByTestId("gen-status")).toContainText(/Ready · \d/, { timeout: 30_000 });
+  clearInterval(watch);
+  // Export is only offered for the full-quality drawing.
+  await page.getByRole("button", { name: "Export SVG" }).click();
+  await expect(page.getByRole("dialog").getByTestId("validation")).toContainText("All export checks passed");
+});
+
+test("returning to an earlier setting is served from the cache", async ({ page }) => {
+  await page.goto("/");
+  await ready(page);
+  await page.getByRole("button", { name: "Next variation (seed + 1)" }).click();
+  await expect(page.getByTestId("gen-status")).toContainText(/Ready · \d/, { timeout: 30_000 });
+  await page.getByRole("button", { name: "Restore previous seed" }).click();
+  await expect(page.getByTestId("gen-status")).toContainText("Ready · from cache", { timeout: 5_000 });
+});
+
+test("keyboard shortcuts", async ({ page }) => {
+  await page.goto("/");
+  await ready(page);
+  const seed = await page.getByTestId("stat-seed").innerText();
+  await page.locator("body").press("r");
+  await expect(page.getByTestId("stat-seed")).not.toHaveText(seed);
+  await page.locator("body").press("b");
+  await expect(page.getByTestId("stat-seed")).toHaveText(seed);
+  await page.locator("body").press("?");
+  await expect(page.getByRole("dialog", { name: "Keyboard shortcuts" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog", { name: "Keyboard shortcuts" })).toHaveCount(0);
+  const [download] = await Promise.all([page.waitForEvent("download"), page.keyboard.press("ControlOrMeta+s")]);
+  expect(download.suggestedFilename()).toMatch(/\.plotlab\.json$/);
+  // Typing in a field never triggers shortcuts.
+  await page.getByLabel("Project name").fill("rrr");
+  await expect(page.getByTestId("stat-seed")).toHaveText(seed);
+});

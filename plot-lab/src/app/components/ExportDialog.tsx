@@ -13,7 +13,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
   const settings = useSettings();
   const { geometry, request, status } = useGeneration();
   const sheet = sheetFor(settings.paper), algo = getAlgorithm(settings.algorithmId)!;
-  const stale = !request || geometryKey(request) !== geometryKey(requestFromSettings());
+  const stale = !request || request.quality === "draft" || geometryKey(request) !== geometryKey(requestFromSettings());
   const [notice, setNotice] = useState("");
 
   const { svg, issues, stats } = useMemo(() => {
@@ -30,7 +30,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
     ];
     const pw = spacingDef && penWarning(currentParams(settings)[spacingDef.id] as number, settings.penWidth);
     if (pw) issues.push(pw);
-    if (stale) issues.unshift({ level: "error", code: "STALE", message: status === "generating" ? "Still generating — wait for it to finish." : "Settings changed since the last generation. Regenerate first." });
+    if (stale) issues.unshift({ level: "error", code: "STALE", message: status === "generating" || request?.quality === "draft" ? "Still generating the full-quality drawing — wait for it to finish." : "Settings changed since the last generation. Regenerate first." });
     return { svg, issues, stats };
   }, [geometry, settings, sheet, algo, stale, status]);
 

@@ -81,9 +81,16 @@ function OptimizeControls() {
       <div className="mt-1 border-t border-line pt-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-faint">Plotter optimisation</div>
       <ToggleControl id="order" label="Reorder paths" description="Nearest-neighbour ordering with reversal, to cut pen-up travel." value={optimize.order} onChange={(v) => setOptimize({ order: v })} />
       <NumberControl id="simplify" label="Simplify tolerance" description="Ramer–Douglas–Peucker. Points never move further than this. 0 = off." value={optimize.simplify} min={0} max={0.5} step={0.01} unit="mm" onChange={(v) => setOptimize({ simplify: v })} />
+      <SafetyControl />
       <NumberControl id="minPathLength" label="Remove paths under" description="Paths shorter than this are dropped. Zero-length paths are always dropped." value={optimize.minPathLength} min={0} max={10} step={0.1} unit="mm" onChange={(v) => setOptimize({ minPathLength: v })} />
     </>
   );
+}
+
+function SafetyControl() {
+  const maxPoints = useSettings((s) => s.maxPoints), setMaxPoints = useSettings((s) => s.setMaxPoints);
+  return <NumberControl id="maxPoints" label="Safety: max points" value={maxPoints} min={100_000} max={20_000_000} step={100_000}
+    description="Drawings with more points than this stop with a message instead of slowing everything down." onChange={setMaxPoints} />;
 }
 
 function ParamControl({ def, values }: { def: ParameterDefinition; values: ParamValues }) {

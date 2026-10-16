@@ -4,6 +4,7 @@ import { ALGORITHMS, getAlgorithm } from "../algorithms/registry";
 import { type ParamValue, type ParamValues, defaultParams, resolveParams } from "../algorithms/types";
 import { DEFAULT_PAPER, type PaperSettings } from "../core/paper";
 import { type ClipSettings, DEFAULT_CLIP } from "../geometry/clipShape";
+import { DEFAULT_MAX_POINTS } from "../pipeline";
 import { DEFAULT_OPTIMIZE, type OptimizeOptions } from "../plotter/optimize";
 import { DEFAULT_PROFILE, type PlotterProfile } from "../plotter/profiles";
 
@@ -26,6 +27,8 @@ export interface SettingsState {
   auto: boolean;
   projectName: string;
   clip: ClipSettings;
+  /** Safety limit: maximum points in one drawing. */
+  maxPoints: number;
 
   setAlgorithm(id: string): void;
   setParam(id: string, value: ParamValue): void;
@@ -44,6 +47,7 @@ export interface SettingsState {
   setAuto(auto: boolean): void;
   setClip(p: Partial<ClipSettings>): void;
   setProjectName(name: string): void;
+  setMaxPoints(n: number): void;
   /** Replace the parameters of one algorithm (presets, variations, projects). */
   setParams(algorithmId: string, params: ParamValues): void;
   /** Start over: defaults for every algorithm, a fresh seed, no clip. Machine settings (profile, pen) are kept. */
@@ -79,6 +83,7 @@ export const useSettings = create<SettingsState>()(
         auto: true,
         projectName: "Untitled",
         clip: DEFAULT_CLIP,
+        maxPoints: DEFAULT_MAX_POINTS,
 
         setAlgorithm: (id) => { if (getAlgorithm(id)) set({ algorithmId: id }); },
         setParam: (id, value) => set((s) => ({ params: { ...s.params, [s.algorithmId]: { ...s.params[s.algorithmId], [id]: value } } })),
@@ -103,6 +108,7 @@ export const useSettings = create<SettingsState>()(
         setView: (p) => set((s) => ({ view: { ...s.view, ...p } })),
         setAuto: (auto) => set({ auto }),
         setClip: (p) => set((s) => ({ clip: { ...s.clip, ...p } })),
+        setMaxPoints: (maxPoints) => set({ maxPoints: Math.max(10_000, Math.round(maxPoints)) }),
         setProjectName: (projectName) => set({ projectName: projectName.slice(0, 120) }),
         setParams: (algorithmId, params) => {
           const a = getAlgorithm(algorithmId);
@@ -133,7 +139,7 @@ export const useSettings = create<SettingsState>()(
       partialize: (s) => ({
         algorithmId: s.algorithmId, params: s.params, seed: s.seed, seedLocked: s.seedLocked, seedHistory: s.seedHistory,
         paper: s.paper, profile: s.profile, penWidth: s.penWidth, strokeColor: s.strokeColor, paperColor: s.paperColor,
-        optimize: s.optimize, view: s.view, auto: s.auto, projectName: s.projectName, clip: s.clip,
+        optimize: s.optimize, view: s.view, auto: s.auto, projectName: s.projectName, clip: s.clip, maxPoints: s.maxPoints,
       }),
     },
   ),

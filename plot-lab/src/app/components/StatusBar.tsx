@@ -11,9 +11,13 @@ const Item = ({ label, children, testid }: { label: string; children: React.Reac
 
 export function StatusBar() {
   const { algorithmId, paper, seed, profile } = useSettings();
-  const { status, progress, before, after, ms, error } = useGeneration();
+  const { status, progress, before, after, ms, error, request, generatingQuality, cached } = useGeneration();
   const sheet = sheetFor(paper);
-  const state = status === "generating" ? `Generating ${Math.round(progress * 100)} %` : status === "error" ? `Error: ${error}` : status === "done" ? `Ready · ${(ms / 1000).toFixed(1)} s` : "Idle";
+  const draft = request?.quality === "draft";
+  const state = status === "generating"
+    ? (generatingQuality === "draft" ? `Draft ${Math.round(progress * 100)} %` : `${draft ? "Refining" : "Generating"} ${Math.round(progress * 100)} %`)
+    : status === "error" ? `Error: ${error}`
+    : status === "done" ? (draft ? "Draft preview" : cached ? "Ready · from cache" : `Ready · ${(ms / 1000).toFixed(1)} s`) : "Idle";
   return (
     <footer className="flex items-center gap-x-5 overflow-x-auto border-t border-line bg-panel px-3 font-mono text-[11px] text-muted tabular-nums">
       <Item label="Algorithm">{getAlgorithm(algorithmId)?.name}</Item>
@@ -28,7 +32,7 @@ export function StatusBar() {
       </>}
       <Item label="Seed" testid="stat-seed">{seed}</Item>
       <span className="ml-auto whitespace-nowrap" data-testid="gen-status">
-        <span className={status === "error" ? "text-danger" : status === "generating" ? "text-accent" : "text-ok"}>●</span> {state}
+        <span className={status === "error" ? "text-danger" : status === "generating" || draft ? "text-accent" : "text-ok"}>●</span> {state}
       </span>
     </footer>
   );
