@@ -50,4 +50,18 @@ describe("image sampler", () => {
     const [bright] = sampleImage(img, area, inside, { ...NO_ADJUST, brightness: 0.3 });
     expect(bright).toBeCloseTo(Math.min(1, dark + 0.3), 6);
   });
+  it("applies levels: black point, white point and midtones", () => {
+    const ramp: GrayImage = { id: "r", name: "r", width: 5, height: 1, data: Float32Array.from([0.05, 0.3, 0.5, 0.85, 0.93]), bits: 8 };
+    const a = { x: 0, y: 0, width: 50, height: 10 }, g = { W: 5, H: 1, x0: 5, y0: 5, sx: 10, sy: 1 };
+    const s = (o: object) => Array.from(sampleImage(ramp, a, g, { ...NO_ADJUST, fit: "stretch", ...o }));
+    expect(s({})).toEqual(Array.from(ramp.data));
+    const lv = s({ blackPoint: 0.1, whitePoint: 0.9 });
+    expect(lv[0]).toBe(0);
+    expect(lv[2]).toBeCloseTo(0.5, 6);
+    expect(lv[3]).toBeCloseTo(0.9375, 6);
+    expect(lv[4]).toBe(1); // lit skin above the white point becomes paper white
+    const mid = s({ midtones: 2 });
+    expect(mid[2]).toBeCloseTo(Math.SQRT1_2, 6);
+    expect(mid[2]).toBeGreaterThan(0.5);
+  });
 });

@@ -13,6 +13,10 @@ export interface ImageAdjust {
   /** mm, from the area centre */
   offsetX: number;
   offsetY: number;
+  /** Levels, applied first: [blackPoint, whitePoint] → [0, 1], then v^(1/midtones). */
+  blackPoint?: number;
+  whitePoint?: number;
+  midtones?: number;
   brightness: number;
   contrast: number;
   invert: boolean;
@@ -44,6 +48,8 @@ export function sampleImage(img: GrayImage, area: Rect, g: SampleGrid, a: ImageA
   const p = placement(img, area, a), pxPerCell = Math.max(g.sx / p.kx, g.sy / p.ky);
   const src = pxPerCell > 1.5 ? blur(img.data, img.width, img.height, 0.45 * pxPerCell) : img.data;
   const out = new Float32Array(g.W * g.H), Wm = img.width - 1, Hm = img.height - 1;
+  const bp = a.blackPoint ?? 0, wp = Math.max(bp + 0.01, a.whitePoint ?? 1), ig = 1 / Math.max(0.05, a.midtones ?? 1);
+  const levels = bp !== 0 || wp !== 1 || ig !== 1;
   for (let j = 0; j < g.H; j++) {
     const v = (g.y0 + j * g.sy - p.top) / p.ky - 0.5;
     for (let i = 0; i < g.W; i++) {
@@ -58,6 +64,10 @@ export function sampleImage(img: GrayImage, area: Rect, g: SampleGrid, a: ImageA
         const r2 = Hm ? (Wm ? src[k + img.width] * (1 - fx) + src[k + img.width + 1] * fx : src[k + img.width]) : r1;
         val = r1 * (1 - fy) + r2 * fy;
         if (adjust) {
+          if (levels) {
+            val = (val - bp) / (wp - bp);
+            val = val <= 0 ? 0 : val >= 1 ? 1 : val ** ig;
+          }
           val = (val - 0.5) * a.contrast + 0.5 + a.brightness;
           val = val < 0 ? 0 : val > 1 ? 1 : val;
           if (a.invert) val = 1 - val;

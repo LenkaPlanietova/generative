@@ -61,7 +61,7 @@ const parameters: ParameterDefinition[] = [
     description: "Feature size of the wobble.", visibleWhen: (v) => (v.wobble as number) > 0 },
   { id: "toneBlur", type: "number", group: "Advanced", label: "Tone smoothing", default: 0.57, min: 0, max: 10, step: 0.01, unit: "mm", description: "Blur of the brightness used for spacing." },
   { id: "preBlur", type: "number", group: "Advanced", label: "Gradient pre-blur", default: 0.18, min: 0, max: 5, step: 0.01, unit: "mm", description: "Blur before measuring the image's gradients." },
-  { id: "whitePoint", type: "number", group: "Advanced", label: "White point", default: 0.985, min: 0.5, max: 1, step: 0.005, description: "Brightness that counts as paper white." },
+  { id: "whitePoint", type: "number", group: "Advanced", label: "Blank above", default: 0.985, min: 0.5, max: 1, step: 0.005, description: "Areas brighter than this get no lines (after Levels). To clear bright skin, lower Levels: white instead." },
   { id: "resolution", type: "number", group: "Advanced", label: "Field resolution", default: 1800, min: 300, max: 3200, step: 50, unit: "px",
     description: "Calculation grid along the long side. Higher follows fine detail; uses more memory." },
 ];
