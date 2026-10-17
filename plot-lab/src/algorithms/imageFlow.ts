@@ -63,7 +63,7 @@ function percentile(a: Float32Array, q: number): number {
   return s[Math.min(s.length - 1, Math.floor(q * s.length))];
 }
 
-export function imageFlowFields(sheet: Sheet, o: ImageFlowOptions, seed: number): { grid: Grid; direction: DirectionField; tone: ScalarField } {
+export function imageFlowFields(sheet: Sheet, o: ImageFlowOptions, seed: number): { grid: Grid; direction: DirectionField; tone: ScalarField; luma: ScalarField } {
   const a = sheet.area, mmPerPx = Math.max(a.width, a.height) / o.resolution;
   const W = Math.max(8, Math.round(a.width / mmPerPx)), H = Math.max(8, Math.round(a.height / mmPerPx)), n = W * H;
   const grid: Grid = { width: W, height: H, mmPerPx };
@@ -72,6 +72,7 @@ export function imageFlowFields(sheet: Sheet, o: ImageFlowOptions, seed: number)
 
   // Tone: blurred brightness, stretched from the 1st percentile to the white point.
   let t = blur(L, W, H, px(o.toneBlur));
+  const luma = o.detailBoost > 0 ? t.slice() : t; // blurred brightness before the stretch
   if (o.detailBoost > 0) {
     const base = blur(t, W, H, px(3));
     for (let i = 0; i < n; i++) t[i] = t[i] + o.detailBoost * (t[i] - base[i]);
@@ -114,7 +115,7 @@ export function imageFlowFields(sheet: Sheet, o: ImageFlowOptions, seed: number)
     mean += Math.hypot(cc, ss);
   }
   if (o.flatFallback) { const eps = (mean / n) * 0.02; for (let i = 0; i < n; i++) c[i] -= eps; }
-  return { grid, direction: { width: W, height: H, c, s }, tone: { width: W, height: H, data: tone } };
+  return { grid, direction: { width: W, height: H, c, s }, tone: { width: W, height: H, data: tone }, luma: { width: W, height: H, data: luma } };
 }
 
 export interface TraceOptions {

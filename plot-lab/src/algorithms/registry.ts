@@ -2,6 +2,7 @@ import { adaptiveHatching } from "./adaptiveHatching";
 import { contourField } from "./contourField";
 import { contourPortrait } from "./contourPortrait";
 import { flowField } from "./flowField";
+import { flowHatching } from "./flowHatching";
 import { harmonograph } from "./harmonograph";
 import { imageDisplacement } from "./imageDisplacement";
 import { guilloche } from "./guilloche";
@@ -21,7 +22,7 @@ import { wavePortrait } from "./wavePortrait";
 export const ALGORITHMS: GenerativeAlgorithm[] = [
   flowField, noiseFlow, contourField, topographic, waveDistortion, radialGeometry, spirograph, lissajous, harmonograph,
   moire, guilloche, interference, reactionDiffusion,
-  redraw, contourPortrait, wavePortrait, adaptiveHatching, imageDisplacement,
+  redraw, contourPortrait, wavePortrait, adaptiveHatching, flowHatching, imageDisplacement,
 ];
 
 export const getAlgorithm = (id: string): GenerativeAlgorithm | undefined => ALGORITHMS.find((a) => a.id === id);
@@ -47,6 +48,6 @@ export const LIBRARY: { category: string; items: { id: string; name: string; pha
   ] },
   { category: "Image-driven", items: [
     { id: "redraw", name: "Redraw" }, { id: "contour-portrait", name: "Contour Portrait" }, { id: "wave-portrait", name: "Wave Portrait" },
-    { id: "hatching", name: "Adaptive Hatching" }, { id: "displacement", name: "Image Displacement" },
+    { id: "hatching", name: "Adaptive Hatching" }, { id: "flow-hatching", name: "Flow Hatching" }, { id: "displacement", name: "Image Displacement" },
   ] },
 ];
