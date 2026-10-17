@@ -6,7 +6,7 @@ import { DEFAULT_PROFILE } from "../src/plotter/profiles";
 import { plotStats } from "../src/plotter/stats";
 import { collection, path } from "./helpers";
 
-const off = { dedupe: 0.001, minPathLength: 0, simplify: 0, order: false };
+const off = { dedupe: 0.001, minPathLength: 0, simplify: 0, order: false, joinGap: 0 };
 
 describe("plotter optimisation", () => {
   it("removes duplicate points and zero-length paths", () => {

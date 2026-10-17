@@ -8,7 +8,7 @@ import { polylineLength } from "../geometry/convert";
 import type { GeometryCollection } from "../geometry/types";
 import { inkDensity } from "../plotter/density";
 import type { PlotterProfile } from "../plotter/profiles";
-import type { PlotStats } from "../plotter/stats";
+import { type PlotStats, travelMoves } from "../plotter/stats";
 import type { ExportSettings } from "./svg";
 
 export interface Issue {
@@ -74,6 +74,10 @@ export function validateGeometry(g: GeometryCollection, sheet: Sheet, s: ExportS
   return issues;
 }
 
+/** Pen-up moves shorter than this (mm) are flagged: the lift costs a full pen-lift delay for almost no travel. */
+export const SHORT_TRAVEL = 0.5;
+const count = (n: number) => n.toLocaleString("en-US");
+
 /** Warnings about how the drawing will plot. */
 export function plotWarnings(g: GeometryCollection, stats: PlotStats, penWidth: number, profile: PlotterProfile, sheet: Sheet): Issue[] {
   const issues: Issue[] = [];
@@ -81,9 +85,12 @@ export function plotWarnings(g: GeometryCollection, stats: PlotStats, penWidth: 
   if (d.saturated > 0.05)
     issues.push(warn("DENSITY", `${Math.round(d.saturated * 100)} % of the inked area is covered solid by overlapping lines at ${penWidth} mm pen width.`));
   if (stats.time > 4 * 3600) issues.push(warn("LONG_PLOT", `Estimated plotting time is ${(stats.time / 3600).toFixed(1)} h.`));
-  if (stats.penLifts > 5000) issues.push(warn("PEN_LIFTS", `${stats.penLifts.toLocaleString()} pen lifts.`));
+  if (stats.penLifts > 5000) issues.push(warn("PEN_LIFTS", `${count(stats.penLifts)} pen lifts.`));
   const short = g.paths.filter((p) => polylineLength(p.points, p.closed) < 1).length;
   if (short > Math.max(20, 0.1 * g.paths.length)) issues.push(warn("SHORT_PATHS", `${short} paths are shorter than 1 mm.`));
+  const hops = travelMoves(g).filter((d) => d < SHORT_TRAVEL).length;
+  if (hops > Math.max(20, 0.05 * stats.penLifts))
+    issues.push(warn("SHORT_TRAVEL", `${count(hops)} pen-up moves are shorter than ${SHORT_TRAVEL} mm — the pen lifts and drops almost in place (about ${Math.max(1, Math.round((hops * profile.penLiftDelay * (profile.timeFactor || 1)) / 60))} min of lifting, and a risk of dots). Set Plotter optimisation → "Join gaps under" to draw across them.`));
   if (profile.maxWidth > 0 && profile.maxHeight > 0) {
     const fits = (sheet.area.width <= profile.maxWidth && sheet.area.height <= profile.maxHeight) || (sheet.area.width <= profile.maxHeight && sheet.area.height <= profile.maxWidth);
     if (!fits) issues.push(warn("PLOTTER_AREA", `Drawing area ${sheet.area.width} × ${sheet.area.height} mm is larger than ${profile.name}'s ${profile.maxWidth} × ${profile.maxHeight} mm.`));

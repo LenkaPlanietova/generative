@@ -1,8 +1,13 @@
 import { Lock, LockOpen, RotateCcw, Shuffle, SkipForward, Undo2 } from "lucide-react";
+import { useState } from "react";
 import { getAlgorithm } from "../../algorithms/registry";
 import { PARAM_GROUPS, type ParameterDefinition, type ParamValues } from "../../algorithms/types";
 import { PAPER_NAMES, type PaperName, sheetFor } from "../../core/paper";
 import { penWarning } from "../../export/validate";
+import { calibrate } from "../../plotter/profiles";
+import { retime } from "../../plotter/stats";
+import { useGeneration } from "../../store/generation";
+import { duration } from "../format";
 import { MAX_SEED, currentParams, useSettings } from "../../store/settings";
 import { ClipControls } from "./ClipControls";
 import { ImageInputs } from "./ImageInputs";
@@ -57,8 +62,38 @@ function PaperControls() {
       <NumberControl id="penDownSpeed" label="Pen-down speed" description="Used for the time estimate." value={profile.penDownSpeed} min={1} max={300} step={1} unit="mm/s" onChange={(v) => setProfile({ penDownSpeed: v })} />
       <NumberControl id="penUpSpeed" label="Pen-up speed" description="Used for the time estimate." value={profile.penUpSpeed} min={1} max={500} step={1} unit="mm/s" onChange={(v) => setProfile({ penUpSpeed: v })} />
       <NumberControl id="penLiftDelay" label="Pen-lift delay" description="Time per pen lift and drop." value={profile.penLiftDelay} min={0} max={3} step={0.05} unit="s" onChange={(v) => setProfile({ penLiftDelay: v })} />
-      <p className="text-[11px] leading-snug text-faint">These are starting values, not the machine's specs. Measure your plotter and enter its real numbers.</p>
+      <NumberControl id="acceleration" label="Acceleration" description="How quickly the plotter gets up to speed. Slows the estimate for corners and short strokes. 0 = ignore." value={profile.acceleration} min={0} max={5000} step={50} unit="mm/s²" onChange={(v) => setProfile({ acceleration: v })} />
+      <p className="text-[11px] leading-snug text-faint">These are starting values, not the machine's specs. Calibrate below after a real plot, or measure your plotter and enter its real numbers.</p>
+      <TimeCalibration />
     </>
+  );
+}
+
+/** Scales the estimate so it matches a real plot of the current drawing. */
+function TimeCalibration() {
+  const profile = useSettings((s) => s.profile), setProfile = useSettings((s) => s.setProfile);
+  const after = useGeneration((s) => s.after), final = useGeneration((s) => s.request?.quality === "final" && s.status === "done");
+  const [minutes, setMinutes] = useState("");
+  const raw = after && final ? retime(after, { ...profile, timeFactor: 1 }) : 0;
+  const real = Number(minutes.replace(",", ".")) * 60;
+  const apply = () => { setProfile({ timeFactor: calibrate(raw, real) }); setMinutes(""); };
+  return (
+    <div className="grid gap-1.5 rounded-md border border-line p-2.5" data-testid="time-calibration">
+      <div className="flex items-center text-muted">
+        <span className="flex-1">Time calibration</span>
+        <span className="font-mono text-[11px] tabular-nums" data-testid="time-factor">{profile.timeFactor === 1 ? "none" : `× ${profile.timeFactor.toFixed(2)}`}</span>
+        {profile.timeFactor !== 1 && <IconButton label="Reset calibration" onClick={() => setProfile({ timeFactor: 1 })}><RotateCcw size={12} /></IconButton>}
+      </div>
+      <p className="text-[11px] leading-snug text-faint">
+        Plotted this drawing? Enter how long it really took{raw > 0 ? ` (uncalibrated estimate ${duration(raw)})` : ""}. Every estimate is scaled to match.
+      </p>
+      <form className="flex items-center gap-1.5" onSubmit={(e) => { e.preventDefault(); if (raw > 0 && real > 0) apply(); }}>
+        <input id="realPlotMinutes" aria-label="Real plot time in minutes" inputMode="decimal" placeholder="minutes" value={minutes} onChange={(e) => setMinutes(e.target.value)}
+          className="h-7 min-w-0 flex-1 rounded border border-line bg-bg px-2 font-mono text-[12px]" />
+        <span className="text-faint">min</span>
+        <button type="submit" disabled={!(raw > 0 && real > 0)} className="h-7 rounded border border-line bg-raised px-2.5 text-fg disabled:opacity-40">Calibrate</button>
+      </form>
+    </div>
   );
 }
 
@@ -80,6 +115,7 @@ function OptimizeControls() {
     <>
       <div className="mt-1 border-t border-line pt-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-faint">Plotter optimisation</div>
       <ToggleControl id="order" label="Reorder paths" description="Nearest-neighbour ordering with reversal, to cut pen-up travel." value={optimize.order} onChange={(v) => setOptimize({ order: v })} />
+      <NumberControl id="joinGap" label="Join gaps under" description="Draws across pen-up gaps this short instead of lifting the pen — fewer lifts, no dots from lifting in place. 0 = off." value={optimize.joinGap} min={0} max={2} step={0.05} unit="mm" onChange={(v) => setOptimize({ joinGap: v })} />
       <NumberControl id="simplify" label="Simplify tolerance" description="Ramer–Douglas–Peucker. Points never move further than this. 0 = off." value={optimize.simplify} min={0} max={0.5} step={0.01} unit="mm" onChange={(v) => setOptimize({ simplify: v })} />
       <SafetyControl />
       <NumberControl id="minPathLength" label="Remove paths under" description="Paths shorter than this are dropped. Zero-length paths are always dropped." value={optimize.minPathLength} min={0} max={10} step={0.1} unit="mm" onChange={(v) => setOptimize({ minPathLength: v })} />

@@ -299,3 +299,40 @@ test("keyboard shortcuts", async ({ page }) => {
   await page.getByLabel("Project name").fill("rrr");
   await expect(page.getByTestId("stat-seed")).toHaveText(seed);
 });
+
+test("multi-layer drawings export one file per pen, singly or as a zip", async ({ page }) => {
+  await page.goto("/");
+  await ready(page);
+  const before = await pathCount(page);
+  await page.getByRole("switch", { name: "Clip to shape" }).click();
+  await page.getByRole("switch", { name: "Draw outline (own layer)" }).click();
+  await expect.poll(async () => (await page.getByTestId("gen-status").innerText()).includes("Ready") && (await pathCount(page)) !== before, { timeout: 30_000 }).toBe(true);
+  await page.getByRole("button", { name: "Export SVG" }).click();
+  const dialog = page.getByRole("dialog", { name: "Export SVG" });
+  const files = dialog.getByTestId("layer-files");
+  await expect(files).toContainText("2 clip outline");
+  const [one] = await Promise.all([page.waitForEvent("download"), files.getByRole("button", { name: "Download layer 2" }).click()]);
+  expect(one.suggestedFilename()).toMatch(/_layer2-clip_outline\.svg$/);
+  const svg = await readFile((await one.path())!, "utf8");
+  expect(svg).toContain('inkscape:label="2 clip outline"');
+  expect(svg).not.toContain('inkscape:label="1 ');
+  const [all] = await Promise.all([page.waitForEvent("download"), files.getByRole("button", { name: /All \(\.zip\)/ }).click()]);
+  expect(all.suggestedFilename()).toMatch(/_layers\.zip$/);
+  const zip = await readFile((await all.path())!);
+  expect(zip.subarray(0, 4).toString("hex")).toBe("504b0304");
+  expect(zip.toString("latin1")).toContain("_layer1-");
+});
+
+test("time calibration scales the estimate to a real plot", async ({ page }) => {
+  await page.goto("/");
+  await ready(page);
+  await page.getByRole("button", { name: "Paper & plotter" }).click();
+  const cal = page.getByTestId("time-calibration");
+  await expect(cal.getByTestId("time-factor")).toHaveText("none");
+  await cal.getByLabel("Real plot time in minutes").fill("30");
+  await cal.getByRole("button", { name: "Calibrate" }).click();
+  await expect(cal.getByTestId("time-factor")).not.toHaveText("none");
+  await expect(page.getByTestId("stat-time")).toContainText("→ 30 min");
+  await cal.getByRole("button", { name: "Reset calibration" }).click();
+  await expect(cal.getByTestId("time-factor")).toHaveText("none");
+});
