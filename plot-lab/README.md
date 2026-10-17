@@ -8,7 +8,7 @@ sizes, preview and validated SVG export. Phase 2 added Contour Field, Wave Disto
 Lissajous Curves and Harmonograph. Phase 3 adds Moiré, Guilloché, Interference, Reaction-Diffusion, advanced noise
 (ridged, billowed, domain-warped), Noise Flow and Topographic Fields. Phase 4 adds image import (16-bit PNG
 aware), a shared image sampler, Redraw (passes the SPEC_ADDENDUM acceptance test), Contour Portrait (the sculptural
-portrait engine), Wave Portrait, Adaptive Hatching and Image Displacement. Phase 5 adds project files, presets, the
+portrait engine), Wave Portrait, Adaptive Hatching, Flow Hatching and Image Displacement. Phase 5 adds project files, presets, the
 variation explorer and clip to shape (SPEC_ADDENDUM §E). Phase 6 adds adaptive preview quality (a quick draft while
 adjusting, then full quality), a cache of recent results, a configurable point safety limit, and keyboard shortcuts
 (press `?` in the app).
@@ -31,6 +31,7 @@ adjusting, then full quality), a cache of recent results, a configurable point s
 | Contour Portrait | Depth map (+ photo relief) → direction, photo → spacing, with fidelity, abstraction, detail preservation and edge sensitivity (spec §8). |
 | Wave Portrait | Parallel lines whose wave amplitude and frequency grow with darkness (phase integrated along the line). |
 | Adaptive Hatching | Up to four hatch directions, each added below a darker tone threshold, each on its own SVG layer. |
+| Flow Hatching | Adaptive Hatching's tone bands drawn with Redraw's streamlines: each darker band adds a layer of evenly spaced lines along the image's forms, turned by a crossing angle (shallow 25° by default, diagonal or right angles), each on its own SVG layer. |
 | Image Displacement | Parallel lines displaced by tone (dark, light, or both ways from mid-grey) plus optional noise. |
 | Reaction-Diffusion | Gray-Scott simulation in the worker on a grid with physical cell size (safety limit 400 k cells), exported as contours only. |
 

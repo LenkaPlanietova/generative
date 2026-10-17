@@ -18,6 +18,7 @@ export const DRAFT_SCALE: Record<string, Record<string, number>> = {
   "wave-portrait": { step: 2.5 },
   displacement: { step: 2.5 },
   hatching: { step: 2 },
+  "flow-hatching": { resolution: 0.4 },
   guilloche: { segment: 2.5 },
   moire: { step: 2.5 },
   radial: { segment: 2.5 },

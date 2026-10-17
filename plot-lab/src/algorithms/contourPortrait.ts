@@ -37,7 +37,7 @@ const parameters: ParameterDefinition[] = [
   { id: "curveSmoothing", type: "number", group: "Distortion", label: "Curve smoothing", default: 0.1, min: 0, max: 1, step: 0.01, unit: "mm",
     description: "Simplify within this tolerance, then round the corners." },
   { id: "toneBlur", type: "number", group: "Advanced", label: "Tone smoothing", default: 0.8, min: 0, max: 10, step: 0.05, unit: "mm", description: "Blur of the brightness used for spacing." },
-  { id: "whitePoint", type: "number", group: "Advanced", label: "White point", default: 0.98, min: 0.5, max: 1, step: 0.005, description: "Brightness that counts as paper white." },
+  { id: "whitePoint", type: "number", group: "Advanced", label: "Blank above", default: 0.98, min: 0.5, max: 1, step: 0.005, description: "Areas brighter than this get no lines (after Levels). To clear bright skin, lower Levels: white instead." },
   { id: "resolution", type: "number", group: "Advanced", label: "Field resolution", default: 1100, min: 300, max: 2400, step: 50, unit: "px", description: "Calculation grid along the long side." },
 ];
 
