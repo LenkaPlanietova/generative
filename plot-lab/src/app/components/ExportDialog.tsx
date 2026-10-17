@@ -1,9 +1,10 @@
-import { CircleAlert, CircleCheck, Copy, Download, TriangleAlert, X } from "lucide-react";
+import { CircleAlert, CircleCheck, Copy, Download, FileArchive, TriangleAlert, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { getAlgorithm } from "../../algorithms/registry";
 import { sheetFor } from "../../core/paper";
 import { type Issue, penWarning, plotWarnings, validateGeometry, validateSvgText } from "../../export/validate";
-import { toSvg } from "../../export/svg";
+import { inkedLayers, toSvg } from "../../export/svg";
+import { zip } from "../../export/zip";
 import { plotStats } from "../../plotter/stats";
 import { geometryKey, requestFromSettings, useGeneration } from "../../store/generation";
 import { currentParams, useSettings } from "../../store/settings";
@@ -16,11 +17,22 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
   const stale = !request || request.quality === "draft" || geometryKey(request) !== geometryKey(requestFromSettings());
   const [notice, setNotice] = useState("");
 
-  const { svg, issues, stats } = useMemo(() => {
-    if (!geometry) return { svg: "", issues: [{ level: "error", code: "EMPTY", message: "Nothing generated yet." } as Issue], stats: null };
+  const { svg, issues, stats, layers } = useMemo(() => {
+    if (!geometry) return { svg: "", issues: [{ level: "error", code: "EMPTY", message: "Nothing generated yet." } as Issue], stats: null, layers: [] };
     const exportSettings = { strokeWidth: settings.penWidth, stroke: settings.strokeColor };
     const meta = { algorithm: algo.id, seed: settings.seed, params: currentParams(settings), paper: settings.paper };
     const svg = toSvg(geometry, exportSettings, `Plot Lab · ${JSON.stringify(meta)}`);
+    const inked = inkedLayers(geometry);
+    // One file per layer, for pen changes: same page and coordinates as the full drawing, so the layers register.
+    const layers = inked.length < 2 ? [] : inked.map((l) => {
+      const n = geometry.layers.indexOf(l) + 1;
+      const file = toSvg(geometry, exportSettings, `Plot Lab · layer ${n} of ${geometry.layers.length} · ${JSON.stringify(meta)}`, l.id);
+      return {
+        id: l.id, n, name: l.name, svg: file, ok: validateSvgText(file, sheet).length === 0,
+        stats: plotStats({ ...geometry, paths: geometry.paths.filter((p) => p.layerId === l.id) }, settings.profile),
+        filename: `plotlab_${algo.id}_${settings.paper.paper}_seed${settings.seed}_layer${n}-${l.name.replace(/[^\w-]+/g, "_")}.svg`,
+      };
+    });
     const stats = plotStats(geometry, settings.profile);
     const spacingDef = algo.parameters.find((p) => p.type === "number" && p.role === "minSpacing");
     const issues: Issue[] = [
@@ -31,7 +43,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
     const pw = spacingDef && penWarning(currentParams(settings)[spacingDef.id] as number, settings.penWidth);
     if (pw) issues.push(pw);
     if (stale) issues.unshift({ level: "error", code: "STALE", message: status === "generating" || request?.quality === "draft" ? "Still generating the full-quality drawing — wait for it to finish." : "Settings changed since the last generation. Regenerate first." });
-    return { svg, issues, stats };
+    return { svg, issues, stats, layers };
   }, [geometry, settings, sheet, algo, stale, status]);
 
   const errors = issues.filter((i) => i.level === "error"), warnings = issues.filter((i) => i.level === "warning");
@@ -51,17 +63,22 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
   }, [onClose]);
 
   const filename = `plotlab_${algo.id}_${settings.paper.paper}_seed${settings.seed}.svg`;
-  const download = () => {
+  const save = (blob: Blob, name: string) => {
     // A fresh URL for every download, released only after the browser has had time to start saving it.
-    const href = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
+    const href = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = href;
-    a.download = filename;
+    a.download = name;
     document.body.appendChild(a);
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(href), 60_000);
-    setNotice(`Download started: ${filename} — check your Downloads folder`);
+    setNotice(`Download started: ${name} — check your Downloads folder`);
+  };
+  const download = () => save(new Blob([svg], { type: "image/svg+xml" }), filename);
+  const downloadLayers = () => {
+    const data = zip(layers.map((l) => ({ name: l.filename, data: l.svg })));
+    save(new Blob([data as BlobPart], { type: "application/zip" }), filename.replace(/\.svg$/, "_layers.zip"));
   };
 
   return (
@@ -95,6 +112,22 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
               {errors.map((i) => <li key={i.code} data-level="error" className="flex items-start gap-2 text-danger"><CircleAlert size={14} className="mt-0.5 shrink-0" /> {i.message}</li>)}
               {warnings.map((i) => <li key={i.code} data-level="warning" className="flex items-start gap-2 text-warn"><TriangleAlert size={14} className="mt-0.5 shrink-0" /> {i.message}</li>)}
             </ul>
+            {layers.length > 0 && <div className="grid gap-1.5 rounded-md border border-line p-2.5" data-testid="layer-files">
+              <div className="flex items-center">
+                <span className="flex-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-faint">One file per pen</span>
+                <button type="button" disabled={errors.length > 0 || layers.some((l) => !l.ok)} onClick={downloadLayers} title="All layer files in one .zip — double-click it to unpack"
+                  className="flex items-center gap-1 rounded border border-line bg-raised px-2 py-0.5 text-[11.5px] text-fg disabled:opacity-40"><FileArchive size={12} /> All (.zip)</button>
+              </div>
+              {layers.map((l) => (
+                <div key={l.id} className="flex items-center gap-2 font-mono text-[11px] tabular-nums">
+                  <span className="min-w-0 flex-1 truncate" title={l.filename}>{l.n} {l.name}</span>
+                  <span className="text-faint">{metres(l.stats.penDown)} · {duration(l.stats.time)}</span>
+                  <button type="button" disabled={errors.length > 0 || !l.ok} onClick={() => save(new Blob([l.svg], { type: "image/svg+xml" }), l.filename)}
+                    aria-label={`Download layer ${l.n}`} title={`Download ${l.filename}`} className="text-muted hover:text-fg disabled:opacity-40"><Download size={13} /></button>
+                </div>
+              ))}
+              <p className="text-[11px] leading-snug text-faint">Same page size and position as the full file, so each pen lines up. Don't move the paper between pens.</p>
+            </div>}
             <details className="rounded-md border border-line">
               <summary className="cursor-pointer px-2.5 py-1.5 text-muted">SVG source</summary>
               <pre className="max-h-56 overflow-auto px-2.5 pb-2 font-mono text-[10.5px] leading-snug text-muted">

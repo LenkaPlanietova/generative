@@ -1,6 +1,7 @@
 /**
  * Pen-plotter optimisation. Only removes degenerate geometry, simplifies within the given tolerance, and
- * reorders/reverses whole paths — it never merges paths or moves points further than `simplify` mm.
+ * reorders/reverses whole paths — it never moves points further than `simplify` mm, and only merges paths when
+ * `joinGap` is set (then consecutive paths of one layer whose gap is at most `joinGap` are drawn without a lift).
  */
 import { polylineLength } from "../geometry/convert";
 import type { GeometryCollection, PlotPath, Point } from "../geometry/types";
@@ -14,9 +15,11 @@ export interface OptimizeOptions {
   simplify: number;
   /** Nearest-neighbour ordering (with reversal of open paths). */
   order: boolean;
+  /** Draw across pen-up gaps up to this long instead of lifting, mm; 0 = off. Applied after ordering. */
+  joinGap: number;
 }
 
-export const DEFAULT_OPTIMIZE: OptimizeOptions = { dedupe: 0.001, minPathLength: 0.5, simplify: 0.05, order: true };
+export const DEFAULT_OPTIMIZE: OptimizeOptions = { dedupe: 0.001, minPathLength: 0.5, simplify: 0.05, order: true, joinGap: 0 };
 
 export function dedupePoints(points: Point[], eps: number): Point[] {
   if (points.length < 2) return points.slice();
@@ -99,5 +102,30 @@ export function optimize(g: GeometryCollection, o: OptimizeOptions): GeometryCol
       paths.push(...ordered);
     }
   }
+  if (o.joinGap > 0) paths = joinGaps(paths, o.joinGap);
   return { ...g, paths };
+}
+
+/** Merges each path into the previous one when both are on the same layer and the gap between them is ≤ `gap` mm. */
+export function joinGaps(paths: PlotPath[], gap: number): PlotPath[] {
+  const out: PlotPath[] = [], g2 = gap * gap;
+  // Closed paths end where they start; as part of a longer stroke they keep their closing segment.
+  const open = (p: PlotPath) => (p.closed ? [...p.points, p.points[0]] : p.points.slice());
+  let joined = false; // whether out's last path owns a fresh points array we may append to
+  for (const p of paths) {
+    const prev = out[out.length - 1];
+    if (prev && prev.layerId === p.layerId) {
+      const e = prev.closed ? prev.points[0] : prev.points[prev.points.length - 1], s = p.points[0];
+      if ((s.x - e.x) ** 2 + (s.y - e.y) ** 2 <= g2) {
+        if (!joined) out[out.length - 1] = { ...prev, closed: false, points: open(prev) };
+        const pts = out[out.length - 1].points;
+        for (const q of p.closed ? [...p.points, p.points[0]] : p.points) pts.push(q);
+        joined = true;
+        continue;
+      }
+    }
+    out.push(p);
+    joined = false;
+  }
+  return out;
 }
