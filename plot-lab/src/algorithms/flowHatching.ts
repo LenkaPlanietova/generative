@@ -30,10 +30,10 @@ const parameters: ParameterDefinition[] = [
     description: "How sharply each darker layer crosses the first. Shallow angles read as a soft weave rather than a mesh.", visibleWhen: (v) => (v.layers as number) >= 2 },
   { id: "offset", type: "number", group: "Structure", label: "Direction offset", default: 0, min: -90, max: 90, step: 1, unit: "°",
     description: "Turns every layer: 0° = the first layer runs along the forms, 90° = across them." },
-  { id: "spacing", type: "number", group: "Density", label: "Line spacing", default: 0.9, min: 0.3, max: 10, step: 0.05, unit: "mm", role: "minSpacing",
-    description: "Gap between lines in the darkest part of each layer. Keep it above 1.2 × pen width." },
-  { id: "spacingVariation", type: "number", group: "Density", label: "Spacing variation", default: 0.8, min: 0, max: 4, step: 0.05, unit: "×",
-    description: "How much wider the gaps get towards a layer's lightest tone (0 = even spacing, 1 = twice as wide)." },
+  { id: "darkestSpacing", type: "number", group: "Density", label: "Darkest spacing", default: 0.9, min: 0.2, max: 10, step: 0.05, unit: "mm", role: "minSpacing",
+    description: "Gap between lines where each layer is darkest. Keep it above 1.2 × pen width, or those areas plot solid black." },
+  { id: "lightestSpacing", type: "number", group: "Density", label: "Lightest spacing", default: 1.6, min: 0.3, max: 15, step: 0.05, unit: "mm",
+    description: "Gap between lines where each layer fades out (at its tone threshold). Equal to the darkest spacing = even lines." },
   { id: "threshold1", type: "number", group: "Density", label: "Layer 1 below tone", default: 0.82, min: 0, max: 1, step: 0.01, description: "Layer 1 draws where the image is darker than this." },
   { id: "threshold2", type: "number", group: "Density", label: "Layer 2 below tone", default: 0.58, min: 0, max: 1, step: 0.01,
     description: "Layer 2 adds its lines where darker than this.", visibleWhen: (v) => (v.layers as number) >= 2 },
@@ -80,7 +80,7 @@ export const flowHatching: GenerativeAlgorithm = {
       toneBlur: num(v, "toneBlur"), whitePoint: 1, detailBoost: 0, edgeSensitivity: 0,
       offset: num(v, "offset"), wobble: 0, wobbleSize: 1, flatFallback: true,
     }, seed);
-    const n = luma.data.length, count = num(v, "layers"), spacing = num(v, "spacing");
+    const n = luma.data.length, count = num(v, "layers");
     const out: GeometryCollection = { widthMm: sheet.width, heightMm: sheet.height, layers: [], paths: [] };
     for (let k = 0; k < count; k++) {
       if (signal?.aborted) break;
@@ -91,7 +91,7 @@ export const flowHatching: GenerativeAlgorithm = {
       const { lines } = traceStreamlines({
         direction: rotated(direction, angle), tone: { width: luma.width, height: luma.height, data: tone }, mmPerPx: grid.mmPerPx,
         params: {
-          darkestSpacing: spacing, lightestSpacing: spacing * (1 + num(v, "spacingVariation")), gamma: 1, clearance: num(v, "clearance"),
+          darkestSpacing: num(v, "darkestSpacing"), lightestSpacing: Math.max(num(v, "darkestSpacing"), num(v, "lightestSpacing")), gamma: 1, clearance: num(v, "clearance"),
           whiteCut: 0.999, minLength: num(v, "minLength"), maxLength: 2000, maxTurn: num(v, "maxTurn"), stepSize: 0.35,
           seedOrder: "dark", seed: seed + k, seedClearance: 1, selfCollision: "half",
         },
