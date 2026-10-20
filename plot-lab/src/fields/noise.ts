@@ -44,6 +44,46 @@ export function perlin2(seed: number): (u: number, v: number) => number {
   };
 }
 
+/** Integer lattice hash in 3D → 0..1. */
+function hash3(ix: number, iy: number, iz: number, seed: number): number {
+  let h = Math.imul(ix, 374761393) ^ Math.imul(iy, 668265263) ^ Math.imul(iz, 2246822519) ^ Math.imul(seed, 1274126177);
+  h = Math.imul(h ^ (h >>> 13), 1103515245);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+
+/** Point-sampled 3D gradient noise, roughly −1..1 with unit feature size. Seamless on any closed 3D surface. */
+export function perlin3(seed: number): (x: number, y: number, z: number) => number {
+  const grad = (ix: number, iy: number, iz: number, dx: number, dy: number, dz: number) => {
+    // Uniform random direction from two hashes.
+    const zc = hash3(ix, iy, iz, seed) * 2 - 1, a = hash3(ix, iy, iz, seed + 1) * Math.PI * 2, r = Math.sqrt(1 - zc * zc);
+    return r * Math.cos(a) * dx + r * Math.sin(a) * dy + zc * dz;
+  };
+  const fade = (t: number) => t * t * t * (t * (t * 6 - 15) + 10);
+  return (x, y, z) => {
+    x += 1000.5; y += 1000.5; z += 1000.5;
+    const x0 = Math.floor(x), y0 = Math.floor(y), z0 = Math.floor(z), tx = x - x0, ty = y - y0, tz = z - z0;
+    const sx = fade(tx), sy = fade(ty), sz = fade(tz);
+    const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+    const plane = (k: number) => {
+      const dz = tz - k, zk = z0 + k;
+      const a = grad(x0, y0, zk, tx, ty, dz), b = grad(x0 + 1, y0, zk, tx - 1, ty, dz);
+      const c = grad(x0, y0 + 1, zk, tx, ty - 1, dz), d = grad(x0 + 1, y0 + 1, zk, tx - 1, ty - 1, dz);
+      return lerp(lerp(a, b, sx), lerp(c, d, sx), sy);
+    };
+    return lerp(plane(0), plane(1), sz) * 1.5;
+  };
+}
+
+/** Fractal sum of 3D gradient noise, roughly −1..1. */
+export function fbm3(seed: number, octaves: number): (x: number, y: number, z: number) => number {
+  const layers = Array.from({ length: Math.max(1, Math.round(octaves)) }, (_, k) => perlin3(seed * 31 + 7 + k));
+  return (x, y, z) => {
+    let s = 0, amp = 1, f = 1, norm = 0;
+    for (let k = 0; k < layers.length; k++) { s += layers[k](x * f + k * 17.3, y * f - k * 9.1, z * f + k * 5.7) * amp; norm += amp; amp *= 0.5; f *= 2; }
+    return s / norm;
+  };
+}
+
 /**
  * Gradient noise on a grid, `scale` in grid px. The lattice is rotated by `angle` so the contours don't line up
  * with the grid axes the way value noise does.

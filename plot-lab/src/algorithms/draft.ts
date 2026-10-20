@@ -22,6 +22,7 @@ export const DRAFT_SCALE: Record<string, Record<string, number>> = {
   guilloche: { segment: 2.5 },
   moire: { step: 2.5 },
   radial: { segment: 2.5 },
+  "noise-torus": { precision: 3, segment: 2.5 },
   wave: { step: 2.5 },
 };
 

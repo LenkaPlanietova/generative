@@ -10,6 +10,7 @@ import { interference } from "./interference";
 import { lissajous } from "./lissajous";
 import { moire } from "./moire";
 import { noiseFlow } from "./noiseFlow";
+import { noiseTorus } from "./noiseTorus";
 import { radialGeometry } from "./radialGeometry";
 import { reactionDiffusion } from "./reactionDiffusion";
 import { redraw } from "./redraw";
@@ -20,7 +21,7 @@ import { waveDistortion } from "./waveDistortion";
 import { wavePortrait } from "./wavePortrait";
 
 export const ALGORITHMS: GenerativeAlgorithm[] = [
-  flowField, noiseFlow, contourField, topographic, waveDistortion, radialGeometry, spirograph, lissajous, harmonograph,
+  flowField, noiseFlow, contourField, topographic, waveDistortion, radialGeometry, spirograph, lissajous, harmonograph, noiseTorus,
   moire, guilloche, interference, reactionDiffusion,
   redraw, contourPortrait, wavePortrait, adaptiveHatching, flowHatching, imageDisplacement,
 ];
@@ -36,7 +37,7 @@ export const LIBRARY: { category: string; items: { id: string; name: string; pha
   { category: "Geometry", items: [
     { id: "radial", name: "Radial Geometry", phase: 2 }, { id: "spirograph", name: "Spirograph", phase: 2 },
     { id: "lissajous", name: "Lissajous Curves", phase: 2 }, { id: "harmonograph", name: "Harmonographs", phase: 2 },
-    { id: "parametric", name: "Parametric Curves", phase: "later" },
+    { id: "noise-torus", name: "Noise Torus" }, { id: "parametric", name: "Parametric Curves", phase: "later" },
   ] },
   { category: "Patterns", items: [
     { id: "wave", name: "Wave Distortion", phase: 2 }, { id: "interference", name: "Interference" },

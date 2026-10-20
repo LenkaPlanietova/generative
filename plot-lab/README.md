@@ -22,6 +22,7 @@ adjusting, then full quality), a cache of recent results, a configurable point s
 | Spirograph | Hypotrochoids / epitrochoids; closes automatically after r / gcd(R, r) turns. |
 | Lissajous Curves | x = A sin(at + δ), y = B sin(bt), with phase-stepped copies for ribbons. |
 | Harmonograph | Four damped oscillators (two per axis), optional seeded detune. |
+| Noise Torus | A torus displaced along its normals by seeded 3D noise (fBm), drawn as rings around the donut and/or the tube, rotated (spin, tilt, turn), projected with optional perspective, hidden lines removed. Top view (tilt 0°) = concentric noise rings. |
 | Noise Flow | Noise-angle flow field (smooth, ridged, billowed or domain-warped noise) on the evenly spaced streamline engine. |
 | Topographic Fields | Contour map of advanced-noise terrain with a sea level; coastline and every Nth contour on a separate "index" layer. |
 | Moiré | Two to six line or ring systems with rotation, offset, waves and a lens; each system is its own SVG layer. |
@@ -50,6 +51,7 @@ npm run build
 | Geometry | `src/geometry/` | `Point`, `PlotPath`, `GeometryCollection`, layers. Sheet millimetres, origin top-left. |
 | Algorithms | `src/algorithms/` | One file per algorithm; shared helpers in `common.ts`. Plugin interface `GenerativeAlgorithm` + `ParameterDefinition`. The UI builds controls from the definitions. Register new algorithms in `registry.ts`. |
 | Fields | `src/core/fields.ts`, `src/fields/` | `DirectionField` (double-angle) and `ScalarField` sources: noise, structure tensor, constant, radial; marching squares in `contours.ts`. |
+| 3D | `src/render3d/hidden.ts` | Hidden-line removal: the surface mesh is rasterised into a depth buffer in sheet mm; each line is tested along its length and cut where the surface is nearer, bridging sub-mm flicker gaps and dropping flecks where lines run edge-on. Camera: spin (Z), tilt (X), turn (Y), orthographic or perspective. |
 | Geometry tools | `src/geometry/clip.ts`, `shape.ts` | Exact polyline clipping to the drawing area (Liang–Barsky), fit-to-area, rotation, Chaikin smoothing. |
 | Engine | `src/engine/streamlines.ts` | Jobard–Lefer evenly spaced streamlines with variable separation, ported from `reference/js/streamlines.worker.js`. |
 | Plotter | `src/plotter/` | Optimiser (dedupe, short-path removal, RDP within tolerance, nearest-neighbour ordering with reversal, optional joining of pen-up gaps under a set length), stats, ink density, plotter profiles. Time estimate = travel at full speed + pen-lift delays + acceleration losses (a full stop costs v / a; a corner keeping f of full speed costs v(1 − f)² / a), times a calibration factor set from a real plot. |
