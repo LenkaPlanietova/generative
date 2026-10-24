@@ -11,6 +11,7 @@ import { duration } from "../format";
 import { MAX_SEED, currentParams, useSettings } from "../../store/settings";
 import { ClipControls } from "./ClipControls";
 import { ImageInputs } from "./ImageInputs";
+import { PlotLayerControls } from "./PlotLayerControls";
 import { PresetControls } from "./PresetControls";
 import { ColorControl, IconButton, Notice, NumberControl, Section, SelectControl, ToggleControl } from "./ui";
 
@@ -163,6 +164,7 @@ export function ParamPanel() {
           </Section>
         );
       })}
+      <Section title="Plot layers" defaultOpen={state.plotLayers.enabled}><PlotLayerControls /></Section>
       <div className="p-3">
         <button type="button" onClick={state.resetParams}
           className="flex w-full items-center justify-center gap-1.5 rounded-md border border-line bg-raised py-1.5 text-muted hover:text-fg">

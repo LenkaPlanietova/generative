@@ -58,9 +58,53 @@ npm run build
 | Export | `src/export/` | Hand-written SVG (mm size + viewBox, Inkscape layers, stroke only) and validation that blocks bad exports. Multi-layer drawings can also export one SVG per layer (same page and coordinates, so pens register), singly or as a stored ZIP (`zip.ts`). Warns when many pen-up moves are under 0.5 mm. |
 | Images | `src/image/` | PNG via fast-png at full bit depth (16-bit depth maps stay 16-bit), JPEG via the browser; one sampler for fit / scale / position (crop), brightness, contrast, invert and blur; built-in sample head. Images live in memory only. |
 | Projects | `src/project/` | JSON project files (format `plot-lab-project`, version 1): algorithm, parameters, seed, paper, stroke, plotter, optimisation, clip, and reference images embedded as PNG (16-bit kept). Parsing validates and clamps everything. Presets and recent projects live in local storage (`src/store/library.ts`). Variations: seeded new seeds and/or mutation of creative parameters (composition, image, quality and pen-safety spacing stay fixed). |
+| Plot Layers | `src/plotter/plotLayers.ts`, `src/geometry/mask.ts`, `src/import/svg.ts`, `src/export/axidraw.ts` | Splits every row by a hand-drawn polygon mask into numbered AxiDraw layers (see below). Runs in the pipeline in place of path ordering. |
 | Clip | `src/geometry/clipShape.ts` | Circle / ellipse / rectangle, keep inside or outside; exact segment–shape intersections; optional outline layer. Runs in the pipeline before optimisation. |
 | Worker | `src/worker/`, `src/pipeline.ts`, `src/store/generation.ts` | Generate → clip → safety check → stats → optimise → stats, off the main thread. Each change cancels the running worker. Algorithms with a draft mode (`src/algorithms/draft.ts`: lower field resolution or coarser sampling only) render a draft ~90 ms after a change and full quality after a 700 ms pause; export only accepts full quality. The last 12 full-quality results are cached by settings, so going back is instant. |
 | UI | `src/app/`, `src/store/` | React + Zustand + Tailwind + Lucide. Settings persist to localStorage and are validated on load. |
+
+## Plot Layers (mask split for AxiDraw)
+
+Pausing an EasyDraw / AxiDraw mid-plot costs a few mm of registration, so instead of pausing, Plot Layers splits the
+drawing by a mask into numbered layers that AxiDraw Control plots one at a time from its **Layers** tab: **1 object**
+(inside the mask) and **2 background** (outside). Names and order are editable. Draw the mask on the canvas (click
+for corners, drag for freehand, Enter or double-click to close) or import it from an SVG layer named `mask`. Any SVG
+of polylines (e.g. an earlier Wave Portrait export) can also be imported as the drawing to split.
+
+Per row, in this order:
+
+1. **Cut** where the row crosses the mask edge.
+2. **Snap** each cut to a flat point. A cut lands only where the line stays within `flatThresholdMm` of its row's
+   baseline over 1 mm, searching up to `snapSearchMm` along the baseline. Moving outwards (into the background)
+   counts once; moving inwards counts three times, so the wiggles stay whole in the object layer. If no flat point is
+   in reach, the cut goes to the nearest wave peak or zero crossing and is **flagged** (red dot in the preview).
+3. **Feathered** edge: each cut moves outwards by a seeded random amount up to `staggerMm`, only onto flat points.
+4. **Merge** pieces shorter than `minSegmentMm` into the neighbouring layer.
+5. **Seam gap** (`seamGapMm`, default 0 = butt joint): only the background side moves. Negative values overlap.
+6. **Direction**: object pieces run left to right. A background piece that touches the mask ends at the mask edge,
+   so the pen lifts off at the seam: left pieces run →, right pieces run ←. A background piece between two parts
+   of the mask, or one that doesn't touch it, runs →.
+7. **Simplify** (Ramer–Douglas–Peucker, `simplifyToleranceMm`).
+
+Rows stay top to bottom and are never reordered: the normal optimiser's ordering and gap-joining are skipped.
+
+- **Ink budget:** each layer's pen-down length is compared with `inkPerPumpMm × inkSafety`. A layer over budget is
+  flagged. Optionally it is split into numbered parts, only between rows.
+- **Priming:** each layer starts with `primeZigzags` zigzags and `primeDabs` 0.3 mm dabs, each layer in a fresh spot
+  of the priming strip. By default the strip sits in the bottom margin. The strip has to be on the page, because
+  AxiDraw doesn't plot outside the document. Validation lets only priming strokes leave the drawing area.
+- **Export:** the plotting layers come first, labelled `1 object`, `2 background`, …; the mask follows on a `%mask`
+  layer. The metadata comment holds the split settings, the mask and the seed. The export dialog also writes
+  step-by-step plotting instructions, and the per-layer ZIP includes them as a text file.
+
+AxiDraw layer-name rules, checked against the driver source (`LayerProperties.parse` / `find_int` in
+evil-mad/axidraw `path_objects.py`) and ported in `src/export/axidraw.ts`:
+
+- The Layers tab plots every layer whose name **starts with** the chosen integer, so `1a` and `1b` are both layer 1.
+- A name whose first character is `%` is a documentation layer and never plots.
+- A leading `!` forces a pause.
+
+Export validation therefore blocks duplicate layer numbers and `!` names.
 
 ## Decisions
 

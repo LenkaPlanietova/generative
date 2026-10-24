@@ -336,3 +336,39 @@ test("time calibration scales the estimate to a real plot", async ({ page }) => 
   await cal.getByRole("button", { name: "Reset calibration" }).click();
   await expect(cal.getByTestId("time-factor")).toHaveText("none");
 });
+
+test("plot layers: draw a mask, split into 1 object / 2 background, export for AxiDraw", async ({ page }) => {
+  await page.goto("/");
+  await ready(page);
+  await page.getByRole("button", { name: /^Wave Portrait/ }).click();
+  await ready(page);
+  await page.getByRole("button", { name: "Plot layers", exact: true }).click();
+  await page.getByRole("switch", { name: "Split into plot layers" }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "no mask yet" })).toBeVisible({ timeout: 30_000 });
+
+  // Draw a polygon mask on the canvas: click corners, Enter closes it.
+  await page.getByRole("button", { name: "Draw the Plot Layers mask" }).click();
+  await expect(page.getByTestId("canvas-hint")).toContainText("Drawing the mask");
+  const box = (await page.getByLabel("Artwork preview").boundingBox())!;
+  const W = 210, H = 297, zoom = Math.min((box.width - 48) / W, (box.height - 84) / H);
+  const ox = box.x + (box.width - W * zoom) / 2, oy = box.y + 60 + (box.height - 84 - H * zoom) / 2;
+  for (const [x, y] of [[70, 60], [140, 60], [150, 150], [140, 240], [70, 240], [60, 150]]) await page.mouse.click(ox + x * zoom, oy + y * zoom);
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("mask-status")).toHaveText("6 points");
+  await expect(page.getByTestId("cut-stats")).toContainText("cuts", { timeout: 30_000 });
+  await ready(page);
+  await expect(page.getByTestId("ink-bars")).toContainText("1 object");
+  await expect(page.getByTestId("ink-bars")).toContainText("2 background");
+
+  await page.getByRole("button", { name: "Export SVG" }).click();
+  const dialog = page.getByRole("dialog", { name: "Export SVG" });
+  await expect(dialog.getByTestId("validation")).toContainText("All export checks passed");
+  await expect(dialog.getByTestId("plot-instructions")).toContainText("Layers tab -> layer 1 (\"object\")");
+  const [file] = await Promise.all([page.waitForEvent("download"), dialog.getByRole("button", { name: "Download SVG" }).click()]);
+  const svg = await readFile((await file.path())!, "utf8");
+  const labels = [...svg.matchAll(/inkscape:label="([^"]*)"/g)].map((m) => m[1]);
+  expect(labels).toEqual(["1 object", "2 background", "%mask"]);
+  expect(svg).toContain('"plotLayers":{');
+  const [zip] = await Promise.all([page.waitForEvent("download"), dialog.getByTestId("layer-files").getByRole("button", { name: /All \(\.zip\)/ }).click()]);
+  expect((await readFile((await zip.path())!)).toString("latin1")).toContain("_instructions.txt");
+});

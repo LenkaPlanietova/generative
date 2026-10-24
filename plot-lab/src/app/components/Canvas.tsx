@@ -1,4 +1,4 @@
-import { Expand, Frame, Grid3x3, Image as ImageIcon, Minus, Plus, Route, Scan, Shrink } from "lucide-react";
+import { Expand, Frame, Grid3x3, Image as ImageIcon, Minus, PenTool, Plus, Route, Scan, Shrink } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { sheetFor } from "../../core/paper";
 import { drawPathOrder, pathsToPath2D } from "../../render/preview";
@@ -10,6 +10,10 @@ import { sampleImage } from "../../image/sampler";
 import { useImages } from "../../store/images";
 import { resolveParams } from "../../algorithms/types";
 import { useSettings } from "../../store/settings";
+import { isValidMask } from "../../geometry/mask";
+import type { Point } from "../../geometry/types";
+import { rdpPoints } from "../../plotter/optimize";
+import { usePlotView } from "../../store/plotView";
 import { IconButton } from "./ui";
 
 /** Camera: CSS px per mm, and the sheet origin's position in CSS px. */
@@ -25,6 +29,11 @@ export function Canvas() {
   const algo = getAlgorithm(useSettings((s) => s.algorithmId))!;
   const rawParams = useSettings((s) => s.params[s.algorithmId]), photo = useImages((s) => s.photo);
   const params = useMemo(() => resolveParams(algo, rawParams ?? {}), [algo, rawParams]);
+  const plotLayers = useSettings((s) => s.plotLayers), setPlotLayers = useSettings((s) => s.setPlotLayers), report = useGeneration((s) => s.plotLayers);
+  const drawing = usePlotView((s) => s.drawing), setDrawing = usePlotView((s) => s.setDrawing), hidden = usePlotView((s) => s.hidden), showSeams = usePlotView((s) => s.seams);
+  // Mask being drawn (sheet mm), and the cursor for the rubber band to it.
+  const [draft, setDraft] = useState<Point[]>([]), [hover, setHover] = useState<Point | null>(null);
+  const pressed = useRef(false);
   const adjustKey = algo.inputs ? JSON.stringify(adjustFrom(params)) : "";
   // The reference image exactly as the algorithm samples it (placement and tone adjustments), for the overlay.
   const reference = useMemo(() => {
@@ -65,6 +74,12 @@ export function Canvas() {
 
   const showing = status === "generating" && partial.length ? partial : geometry?.paths ?? [];
   const path2d = useMemo(() => pathsToPath2D(showing), [showing]);
+  // Plot layers: one colour per layer, each toggleable.
+  const split = !!report && status !== "generating" && !!geometry && geometry.layers.some((l) => l.id === report.layers[0]?.id);
+  const layerPaths = useMemo(() => !split || !geometry ? [] : report!.layers.map((l) => ({
+    number: l.number, spot: l.spot, stroke: geometry.layers.find((x) => x.id === l.id)?.stroke ?? strokeColor,
+    path: pathsToPath2D(geometry.paths.filter((p) => p.layerId === l.id)), start: geometry.paths.find((p) => p.layerId === l.id && !p.prime)?.points[0],
+  })), [split, geometry, report, strokeColor]);
 
   useEffect(() => {
     const c = cv.current;
@@ -107,14 +122,114 @@ export function Canvas() {
     }
     // Artwork at the real pen width (in mm), so density on screen matches the plot.
     if (view.pathViz && status !== "generating") drawPathOrder(ctx, showing, penWidth, px);
-    else {
+    else if (split) {
+      ctx.lineWidth = penWidth;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      for (const l of layerPaths) if (!hidden.includes(l.number)) { ctx.strokeStyle = l.stroke; ctx.stroke(l.path); }
+    } else {
       ctx.strokeStyle = strokeColor;
       ctx.lineWidth = penWidth;
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
       ctx.stroke(path2d);
     }
-  }, [cam, size, sheet, view, penWidth, strokeColor, paperColor, path2d, showing, status, reference]);
+    // Plot layers overlay: priming strip, plot order, seams, mask.
+    if (plotLayers.enabled && report) {
+      if (report.primeArea) {
+        const a = report.primeArea;
+        ctx.strokeStyle = "rgba(120,120,120,0.8)";
+        ctx.lineWidth = px;
+        ctx.setLineDash([px * 3, px * 3]);
+        ctx.strokeRect(a.x, a.y, a.width, a.height);
+        ctx.setLineDash([]);
+      }
+      ctx.font = `bold ${14 * px}px ui-sans-serif, system-ui, sans-serif`;
+      ctx.textBaseline = "bottom";
+      for (const l of layerPaths) {
+        const at = l.spot ? { x: l.spot.x, y: l.spot.y - 2 * px } : l.start;
+        if (!at) continue;
+        ctx.fillStyle = l.stroke;
+        ctx.fillText(String(l.number), at.x, at.y);
+      }
+      if (showSeams && split) {
+        const r = Math.max(penWidth * 0.6, 2.5 * px);
+        ctx.fillStyle = "rgba(47,158,68,0.9)";
+        ctx.beginPath();
+        for (const s of report.seams) if (!s.flagged) { ctx.moveTo(s.x + r, s.y); ctx.arc(s.x, s.y, r, 0, 2 * Math.PI); }
+        ctx.fill();
+        ctx.fillStyle = "rgba(224,49,49,0.95)";
+        ctx.beginPath();
+        for (const s of report.seams) if (s.flagged) { ctx.moveTo(s.x + r * 1.6, s.y); ctx.arc(s.x, s.y, r * 1.6, 0, 2 * Math.PI); }
+        ctx.fill();
+      }
+    }
+    const mask = drawing ? draft : plotLayers.enabled ? plotLayers.mask : [];
+    if (mask.length) {
+      ctx.strokeStyle = "#e040fb";
+      ctx.lineWidth = 1.5 * px;
+      ctx.setLineDash(drawing ? [] : [px * 6, px * 4]);
+      ctx.beginPath();
+      ctx.moveTo(mask[0].x, mask[0].y);
+      for (const p of mask.slice(1)) ctx.lineTo(p.x, p.y);
+      if (drawing && hover) ctx.lineTo(hover.x, hover.y);
+      else if (!drawing) ctx.closePath();
+      ctx.stroke();
+      ctx.setLineDash([]);
+      if (drawing) {
+        ctx.fillStyle = "#e040fb";
+        ctx.beginPath();
+        ctx.arc(mask[0].x, mask[0].y, 4 * px, 0, 2 * Math.PI);
+        ctx.fill();
+      }
+    }
+  }, [cam, size, sheet, view, penWidth, strokeColor, paperColor, path2d, showing, status, reference, split, layerPaths, hidden, showSeams, plotLayers, report, drawing, draft, hover]);
+
+  // Mask drawing: click for corners, drag for freehand, click the first point, double-click or Enter to close.
+  const toMm = (e: { clientX: number; clientY: number }): Point | null => {
+    const c = cv.current;
+    if (!c || !cam) return null;
+    const r = c.getBoundingClientRect();
+    return { x: (e.clientX - r.left - cam.x) / cam.zoom, y: (e.clientY - r.top - cam.y) / cam.zoom };
+  };
+  const closeMask = useCallback((pts: Point[]) => {
+    if (pts.length >= 3) {
+      const mask = rdpPoints(pts, 0.1).map((p) => ({ x: Math.round(p.x * 100) / 100, y: Math.round(p.y * 100) / 100 }));
+      if (isValidMask(mask)) setPlotLayers({ mask, enabled: true });
+    }
+    setDraft([]);
+    setDrawing(false);
+  }, [setPlotLayers, setDrawing]);
+  useEffect(() => { if (!drawing) { setDraft([]); setHover(null); } }, [drawing]);
+  useEffect(() => {
+    if (!drawing) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (/^(INPUT|SELECT|TEXTAREA)$/.test((e.target as HTMLElement).tagName)) return;
+      if (e.key === "Enter") closeMask(draft);
+      else if (e.key === "Escape") setDrawing(false);
+      else if (e.key === "Backspace") setDraft((d) => d.slice(0, -1));
+      else return;
+      e.preventDefault();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [drawing, draft, closeMask, setDrawing]);
+  const onDrawDown = (e: React.PointerEvent) => {
+    const p = toMm(e);
+    if (!p || !cam) return;
+    (e.target as Element).setPointerCapture(e.pointerId);
+    pressed.current = true;
+    const first = draft[0];
+    if (first && draft.length >= 3 && Math.hypot(p.x - first.x, p.y - first.y) * cam.zoom < 8) { closeMask(draft); pressed.current = false; return; }
+    setDraft((d) => [...d, p]);
+  };
+  const onDrawMove = (e: React.PointerEvent) => {
+    const p = toMm(e);
+    if (!p || !cam) return;
+    setHover(p);
+    // Freehand while the button is held: a point every 3 screen px.
+    if (pressed.current) setDraft((d) => { const l = d[d.length - 1]; return !l || Math.hypot(p.x - l.x, p.y - l.y) * cam.zoom >= 3 ? [...d, p] : d; });
+  };
 
   // Wheel zoom around the cursor, drag to pan, double-click to fit.
   useEffect(() => {
@@ -162,19 +277,22 @@ export function Canvas() {
   return (
     <div ref={wrap} className="relative min-h-0 min-w-0 overflow-hidden bg-[#0b0c0e]" data-testid="artwork">
       <canvas ref={cv} aria-label="Artwork preview" style={{ width: size.w, height: size.h }}
-        className={drag.current ? "cursor-grabbing" : "cursor-grab"}
-        onPointerDown={(e) => { drag.current = { x: e.clientX, y: e.clientY }; (e.target as Element).setPointerCapture(e.pointerId); }}
+        className={drawing ? "cursor-crosshair" : drag.current ? "cursor-grabbing" : "cursor-grab"}
+        onPointerDown={(e) => { if (drawing) { onDrawDown(e); return; } drag.current = { x: e.clientX, y: e.clientY }; (e.target as Element).setPointerCapture(e.pointerId); }}
         onPointerMove={(e) => {
+          if (drawing) { onDrawMove(e); return; }
           if (!drag.current) return;
           const dx = e.clientX - drag.current.x, dy = e.clientY - drag.current.y;
           drag.current = { x: e.clientX, y: e.clientY };
           setCam((cur) => cur && { ...cur, x: cur.x + dx, y: cur.y + dy });
           setFitted(false);
         }}
-        onPointerUp={() => { drag.current = null; }}
-        onDoubleClick={fit} />
-      <p className="pointer-events-none absolute bottom-2 left-3 text-[11px] text-faint">
-        Zoom: − / + buttons, + / − keys or scroll · Drag to move · Double-click or 0 to fit
+        onPointerUp={() => { drag.current = null; pressed.current = false; }}
+        onDoubleClick={() => (drawing ? closeMask(draft) : fit())} />
+      <p className={`pointer-events-none absolute bottom-2 left-3 text-[11px] ${drawing ? "text-accent" : "text-faint"}`} data-testid="canvas-hint">
+        {drawing
+          ? "Drawing the mask: click for corners, drag for freehand · click the first point, double-click or Enter to close · Backspace undoes · Esc cancels"
+          : "Zoom: − / + buttons, + / − keys or scroll · Drag to move · Double-click or 0 to fit"}
       </p>
       <div className="absolute top-3 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-lg border border-line bg-panel/90 p-1 shadow-lg backdrop-blur">
         <IconButton label="Zoom out (−)" onClick={() => zoomBy(1 / 1.25)}><Minus size={15} /></IconButton>
@@ -189,6 +307,7 @@ export function Canvas() {
         <IconButton label="Grid (10 mm)" active={view.grid} onClick={() => setView({ grid: !view.grid })}><Grid3x3 size={14} /></IconButton>
         {algo.inputs && <IconButton label="Show reference image" active={view.reference} onClick={() => setView({ reference: !view.reference })}><ImageIcon size={14} /></IconButton>}
         <IconButton label="Path order and pen-up moves" active={view.pathViz} onClick={() => setView({ pathViz: !view.pathViz })}><Route size={14} /></IconButton>
+        <IconButton label={drawing ? "Stop drawing the mask (Esc)" : "Draw the Plot Layers mask"} active={drawing} onClick={() => setDrawing(!drawing)}><PenTool size={14} /></IconButton>
         <span className="mx-1 h-4 w-px bg-line" />
         <IconButton label={fullscreen ? "Exit full screen" : "Full screen"}
           onClick={() => (fullscreen ? document.exitFullscreen() : wrap.current?.requestFullscreen())}>

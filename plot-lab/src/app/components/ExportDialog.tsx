@@ -1,9 +1,10 @@
-import { CircleAlert, CircleCheck, Copy, Download, FileArchive, TriangleAlert, X } from "lucide-react";
+import { CircleAlert, CircleCheck, Copy, Download, FileArchive, FileText, TriangleAlert, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { getAlgorithm } from "../../algorithms/registry";
 import { sheetFor } from "../../core/paper";
 import { type Issue, penWarning, plotWarnings, validateGeometry, validateSvgText } from "../../export/validate";
-import { inkedLayers, toSvg } from "../../export/svg";
+import { inkedLayers, maskGuide, toSvg } from "../../export/svg";
+import { plotInstructions, plotLayersMeta } from "../../plotter/plotLayers";
 import { zip } from "../../export/zip";
 import { plotStats } from "../../plotter/stats";
 import { geometryKey, requestFromSettings, useGeneration } from "../../store/generation";
@@ -12,16 +13,19 @@ import { count, duration, metres } from "../format";
 
 export function ExportDialog({ onClose }: { onClose: () => void }) {
   const settings = useSettings();
-  const { geometry, request, status } = useGeneration();
+  const { geometry, request, status, plotLayers: report } = useGeneration();
   const sheet = sheetFor(settings.paper), algo = getAlgorithm(settings.algorithmId)!;
   const stale = !request || request.quality === "draft" || geometryKey(request) !== geometryKey(requestFromSettings());
   const [notice, setNotice] = useState("");
 
-  const { svg, issues, stats, layers } = useMemo(() => {
-    if (!geometry) return { svg: "", issues: [{ level: "error", code: "EMPTY", message: "Nothing generated yet." } as Issue], stats: null, layers: [] };
+  const { svg, issues, stats, layers, instructions } = useMemo(() => {
+    if (!geometry) return { svg: "", issues: [{ level: "error", code: "EMPTY", message: "Nothing generated yet." } as Issue], stats: null, layers: [], instructions: "" };
     const exportSettings = { strokeWidth: settings.penWidth, stroke: settings.strokeColor };
-    const meta = { algorithm: algo.id, seed: settings.seed, params: currentParams(settings), paper: settings.paper };
-    const svg = toSvg(geometry, exportSettings, `Plot Lab · ${JSON.stringify(meta)}`);
+    // Plot layers: the split settings (mask and seed included) go into the metadata, the mask onto a %mask layer.
+    const pl = request?.plotLayers && report && geometry.layers.some((l) => l.id === report.layers[0]?.id) ? request.plotLayers : undefined;
+    const meta = { algorithm: algo.id, seed: settings.seed, params: currentParams(settings), paper: settings.paper, ...(pl ? { plotLayers: plotLayersMeta(pl, settings.seed) } : {}) };
+    const guides = pl ? [maskGuide(pl.mask)] : [];
+    const svg = toSvg(geometry, exportSettings, `Plot Lab · ${JSON.stringify(meta)}`, undefined, guides);
     const inked = inkedLayers(geometry);
     // One file per layer, for pen changes: same page and coordinates as the full drawing, so the layers register.
     const layers = inked.length < 2 ? [] : inked.map((l) => {
@@ -35,7 +39,9 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
     });
     const stats = plotStats(geometry, settings.profile);
     const spacingDef = algo.parameters.find((p) => p.type === "number" && p.role === "minSpacing");
+    const instructions = pl && report ? plotInstructions(report, pl, (id) => plotStats({ ...geometry, paths: geometry.paths.filter((p) => p.layerId === id) }, settings.profile).time) : "";
     const issues: Issue[] = [
+      ...(report?.issues ?? []),
       ...validateGeometry(geometry, sheet, exportSettings),
       ...validateSvgText(svg, sheet),
       ...plotWarnings(geometry, stats, settings.penWidth, settings.profile, sheet),
@@ -43,8 +49,8 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
     const pw = spacingDef && penWarning(currentParams(settings)[spacingDef.id] as number, settings.penWidth);
     if (pw) issues.push(pw);
     if (stale) issues.unshift({ level: "error", code: "STALE", message: status === "generating" || request?.quality === "draft" ? "Still generating the full-quality drawing — wait for it to finish." : "Settings changed since the last generation. Regenerate first." });
-    return { svg, issues, stats, layers };
-  }, [geometry, settings, sheet, algo, stale, status]);
+    return { svg, issues, stats, layers, instructions };
+  }, [geometry, settings, sheet, algo, stale, status, request, report]);
 
   const errors = issues.filter((i) => i.level === "error"), warnings = issues.filter((i) => i.level === "warning");
   // The preview URL is created and revoked inside one effect, so it is valid for exactly as long as it is shown
@@ -77,7 +83,9 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
   };
   const download = () => save(new Blob([svg], { type: "image/svg+xml" }), filename);
   const downloadLayers = () => {
-    const data = zip(layers.map((l) => ({ name: l.filename, data: l.svg })));
+    const files = layers.map((l) => ({ name: l.filename, data: l.svg }));
+    if (instructions) files.push({ name: filename.replace(/\.svg$/, "_instructions.txt"), data: instructions });
+    const data = zip(files);
     save(new Blob([data as BlobPart], { type: "application/zip" }), filename.replace(/\.svg$/, "_layers.zip"));
   };
 
@@ -114,7 +122,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
             </ul>
             {layers.length > 0 && <div className="grid gap-1.5 rounded-md border border-line p-2.5" data-testid="layer-files">
               <div className="flex items-center">
-                <span className="flex-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-faint">One file per pen</span>
+                <span className="flex-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-faint">{instructions ? "One file per layer" : "One file per pen"}</span>
                 <button type="button" disabled={errors.length > 0 || layers.some((l) => !l.ok)} onClick={downloadLayers} title="All layer files in one .zip — double-click it to unpack"
                   className="flex items-center gap-1 rounded border border-line bg-raised px-2 py-0.5 text-[11.5px] text-fg disabled:opacity-40"><FileArchive size={12} /> All (.zip)</button>
               </div>
@@ -127,6 +135,16 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
                 </div>
               ))}
               <p className="text-[11px] leading-snug text-faint">Same page size and position as the full file, so each pen lines up. Don't move the paper between pens.</p>
+            </div>}
+            {instructions && <div className="grid gap-1.5 rounded-md border border-line p-2.5" data-testid="plot-instructions">
+              <div className="flex items-center">
+                <span className="flex-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-faint">Plotting instructions</span>
+                <button type="button" onClick={() => navigator.clipboard.writeText(instructions).then(() => setNotice("Instructions copied"), () => setNotice("Clipboard blocked by the browser"))}
+                  className="flex items-center gap-1 rounded border border-line bg-raised px-2 py-0.5 text-[11.5px] text-fg"><Copy size={12} /> Copy</button>
+                <button type="button" onClick={() => save(new Blob([instructions], { type: "text/plain" }), filename.replace(/\.svg$/, "_instructions.txt"))} aria-label="Download instructions"
+                  className="ml-1 flex items-center gap-1 rounded border border-line bg-raised px-2 py-0.5 text-[11.5px] text-fg"><FileText size={12} /> .txt</button>
+              </div>
+              <pre className="max-h-56 overflow-auto whitespace-pre-wrap font-mono text-[10.5px] leading-snug text-muted">{instructions}</pre>
             </div>}
             <details className="rounded-md border border-line">
               <summary className="cursor-pointer px-2.5 py-1.5 text-muted">SVG source</summary>
