@@ -9,6 +9,7 @@ import type { GeometryCollection } from "../geometry/types";
 import { inkDensity } from "../plotter/density";
 import type { PlotterProfile } from "../plotter/profiles";
 import { type PlotStats, travelMoves } from "../plotter/stats";
+import { parseLayerName, svgLayers } from "./axidraw";
 import type { ExportSettings } from "./svg";
 
 export interface Issue {
@@ -48,19 +49,22 @@ export function validateGeometry(g: GeometryCollection, sheet: Sheet, s: ExportS
     issues.push(err("DIMENSIONS", `Geometry is ${g.widthMm} × ${g.heightMm} mm but the paper is ${sheet.width} × ${sheet.height} mm. Regenerate first.`));
 
   // Geometry exists, coordinates finite and inside the drawing area
-  let drawable = 0, ink = 0, nonFinite = 0, outside = 0;
-  const a = sheet.area, tol = 0.01;
+  let drawable = 0, ink = 0, nonFinite = 0, outside = 0, offSheet = 0;
+  const tol = 0.01;
   for (const p of g.paths) {
     let ok = p.points.length >= 2;
+    // Plot Layers priming strokes belong in the margin, so they only have to stay on the sheet.
+    const a = p.prime ? { x: 0, y: 0, width: sheet.width, height: sheet.height } : sheet.area;
     for (const q of p.points) {
       if (!Number.isFinite(q.x) || !Number.isFinite(q.y)) { nonFinite++; ok = false; continue; }
-      if (q.x < a.x - tol || q.y < a.y - tol || q.x > a.x + a.width + tol || q.y > a.y + a.height + tol) outside++;
+      if (q.x < a.x - tol || q.y < a.y - tol || q.x > a.x + a.width + tol || q.y > a.y + a.height + tol) { if (p.prime) offSheet++; else outside++; }
     }
     if (ok) { drawable++; ink += polylineLength(p.points, p.closed); }
   }
   if (nonFinite) issues.push(err("NON_FINITE", `${nonFinite} point(s) have non-finite coordinates.`));
   if (drawable === 0 || ink <= 0) issues.push(err("EMPTY", "There is no visible geometry to export."));
   if (outside) issues.push(err("OUT_OF_AREA", `${outside} point(s) fall outside the drawing area (inside the margins).`));
+  if (offSheet) issues.push(err("PRIME_OFF_SHEET", `${offSheet} priming point(s) fall off the sheet.`));
 
   // Stroke
   if (!Number.isFinite(s.strokeWidth) || s.strokeWidth < 0.05 || s.strokeWidth > 5)
@@ -115,6 +119,11 @@ export function validateSvgText(svg: string, sheet: Pick<Sheet, "width" | "heigh
   if (/<image\b|<foreignObject\b|<filter\b|<clipPath\b|<mask\b|<style\b|\sstyle="|vector-effect|transform=/.test(svg))
     issues.push(err("SVG_UNSUPPORTED", "The SVG contains raster images, filters, clipping, CSS or transforms."));
   if (/\sfill="(?!none")/.test(svg)) issues.push(err("SVG_FILL", "The SVG contains filled shapes."));
+  // AxiDraw Control's Layers tab plots by the number a layer name starts with: each plotting layer needs its own.
+  const numbers = svgLayers(svg).map((l) => parseLayerName(l.label)).filter((l) => !l.skip);
+  if (numbers.some((l) => l.pause)) issues.push(err("SVG_LAYER_PAUSE", "A layer name starts with \"!\", which makes AxiDraw pause before it."));
+  const seen = numbers.map((l) => l.number).filter((n) => n !== null);
+  if (new Set(seen).size !== seen.length) issues.push(err("SVG_LAYER_NUMBERS", "Two plotting layers share a number, so AxiDraw's Layers tab would plot them together."));
   if (!/\sstroke="#[0-9a-fA-F]{3,6}"/.test(svg) || !/\sstroke-width="[\d.]+"/.test(svg)) issues.push(err("SVG_STROKE", "The SVG has no stroke colour or width."));
   return issues;
 }

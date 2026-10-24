@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Hand-made fixture: Inkscape-style file in px (96 dpi) with layer transforms, a mask layer and three rows. -->
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+     width="793.70081" height="1122.5197" viewBox="0 0 210 297">
+  <defs><path id="unused" d="M0,0L999,999"/></defs>
+  <g inkscape:groupmode="layer" inkscape:label="rows" id="layer1" transform="translate(0,10)">
+    <path d="M 20,90 H 190" />
+    <polyline points="20,140 60,140 100,140 190,140" />
+    <path d="m 20,190 c 30,0 60,0 85,0 l 85,0" />
+  </g>
+  <g inkscape:groupmode="layer" inkscape:label="mask" id="layer2">
+    <path d="M 70,60 L 140,60 L 140,240 L 70,240 Z" />
+    <path d="M 10,10 L 12,10 L 12,12 Z" />
+  </g>
+  <g inkscape:groupmode="layer" inkscape:label="%notes" id="layer3"><path d="M5,5L6,6"/></g>
+</svg>

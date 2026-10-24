@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { GeometryCollection, PlotPath } from "../geometry/types";
+import type { PlotLayerReport } from "../plotter/plotLayers";
 import type { PlotStats } from "../plotter/stats";
 import type { GenerateRequest, GenerateResult } from "../pipeline";
 import { hasDraft } from "../algorithms/draft";
@@ -7,6 +8,7 @@ import type { WorkerRequest, WorkerResponse } from "../worker/protocol";
 import GenerateWorker from "../worker/generate.worker.ts?worker";
 import { getAlgorithm } from "../algorithms/registry";
 import { useImages } from "./images";
+import { useImported } from "./imported";
 import { currentParams, useSettings } from "./settings";
 
 export interface GenerationState {
@@ -25,11 +27,13 @@ export interface GenerationState {
   generatingQuality: "draft" | "final";
   /** The shown result came from the cache. */
   cached: boolean;
+  /** Plot Layers split of the shown drawing, when it is on. */
+  plotLayers: PlotLayerReport | null;
 }
 
 export const useGeneration = create<GenerationState>()(() => ({
   status: "idle", progress: 0, partial: [], geometry: null, request: null, before: null, after: null, ms: 0, error: null, thumbnails: {},
-  generatingQuality: "final", cached: false,
+  generatingQuality: "final", cached: false, plotLayers: null,
 }));
 
 let worker: Worker | null = null, job = 0, draftTimer = 0, finalTimer = 0;
@@ -40,12 +44,15 @@ export function requestFromSettings(): GenerateRequest {
   return {
     algorithmId: s.algorithmId, params: currentParams(s), seed: s.seed, paper: s.paper, optimize: s.optimize, profile: s.profile,
     images, clip: s.clip, quality: "final", maxPoints: s.maxPoints,
+    plotLayers: s.plotLayers.enabled ? { ...s.plotLayers, penWidth: s.penWidth } : undefined,
+    imported: useImported.getState().svg?.input,
   };
 }
 
 /** The parts of a request that change the geometry (plotter speeds only change the statistics). */
 export const geometryKey = (r: GenerateRequest) =>
-  JSON.stringify([r.algorithmId, r.params, r.seed, r.paper, r.optimize, r.images?.photo?.id, r.images?.depth?.id, r.clip?.enabled ? r.clip : null, r.maxPoints]);
+  JSON.stringify([r.algorithmId, r.params, r.seed, r.paper, r.optimize, r.images?.photo?.id, r.images?.depth?.id, r.clip?.enabled ? r.clip : null, r.maxPoints,
+    r.plotLayers ?? null, r.imported ? useImported.getState().svg?.id ?? "imported" : null]);
 
 /** Recent full-quality results, so returning to an earlier setting is instant. */
 const CACHE_SIZE = 12;
@@ -73,7 +80,7 @@ export function generateNow(quality: "draft" | "final" = "final"): void {
     job++;
     cache.delete(key);
     cache.set(key, hit); // most recently used
-    useGeneration.setState({ status: "done", progress: 1, partial: [], geometry: hit.geometry, request, before: hit.before, after: hit.after, ms: 0, error: null, cached: true });
+    useGeneration.setState({ status: "done", progress: 1, partial: [], geometry: hit.geometry, request, before: hit.before, after: hit.after, ms: 0, error: null, cached: true, plotLayers: hit.plotLayers ?? null });
     return;
   }
   worker?.terminate();
@@ -93,7 +100,7 @@ export function generateNow(quality: "draft" | "final" = "final"): void {
     } else if (m.type === "done") {
       const { type: _t, job: _j, ...result } = m;
       if (quality === "final") remember(key, result);
-      useGeneration.setState({ status: "done", progress: 1, partial: [], geometry: m.geometry, request, before: m.before, after: m.after, ms: m.ms, cached: false });
+      useGeneration.setState({ status: "done", progress: 1, partial: [], geometry: m.geometry, request, before: m.before, after: m.after, ms: m.ms, cached: false, plotLayers: m.plotLayers ?? null });
     } else if (m.type === "error") {
       useGeneration.setState({ status: "error", error: m.message });
     }
@@ -136,6 +143,6 @@ export function startAutoGenerate(): () => void {
     last = next;
     if (useSettings.getState().auto) scheduleGenerate();
   };
-  const a = useSettings.subscribe(check), b = useImages.subscribe(check);
-  return () => { a(); b(); };
+  const a = useSettings.subscribe(check), b = useImages.subscribe(check), c = useImported.subscribe(check);
+  return () => { a(); b(); c(); };
 }

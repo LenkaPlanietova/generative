@@ -1,6 +1,6 @@
 /**
  * Project files (spec §13): everything needed to regenerate a piece — algorithm, parameters, seed, paper, stroke,
- * plotter, optimisation and clip settings, plus reference images embedded as PNG (16-bit images stay 16-bit).
+ * plotter, optimisation, clip and plot-layer settings (mask included), plus reference images embedded as PNG (16-bit images stay 16-bit).
  */
 import { encode } from "fast-png";
 import { getAlgorithm } from "../algorithms/registry";
@@ -10,6 +10,7 @@ import { type ClipSettings, DEFAULT_CLIP } from "../geometry/clipShape";
 import { decodePngGray } from "../image/decode";
 import type { GrayImage, ImageInputs } from "../image/types";
 import { DEFAULT_OPTIMIZE, type OptimizeOptions } from "../plotter/optimize";
+import { type PlotLayerSettings, sanitizePlotLayers } from "../plotter/plotLayers";
 import { DEFAULT_PROFILE, type PlotterProfile } from "../plotter/profiles";
 
 export const PROJECT_FORMAT = "plot-lab-project";
@@ -32,12 +33,15 @@ export interface ProjectFile {
   paperColor: string;
   optimize: OptimizeOptions;
   clip: ClipSettings;
+  /** Absent in files saved before Plot Layers; loads as the defaults. */
+  plotLayers?: PlotLayerSettings;
   images?: { photo?: EmbeddedImage; depth?: EmbeddedImage };
 }
 
 export type ProjectState = Pick<ProjectFile, "algorithmId" | "seed" | "paper" | "profile" | "penWidth" | "strokeColor" | "paperColor" | "optimize" | "clip"> & {
   projectName: string;
   params: Record<string, ParamValues>;
+  plotLayers?: PlotLayerSettings;
 };
 
 function toBase64(bytes: Uint8Array): string {
@@ -72,7 +76,7 @@ export function makeProject(s: ProjectState, images: ImageInputs = {}, includeIm
     format: PROJECT_FORMAT, version: PROJECT_VERSION, name: s.projectName, savedAt: new Date().toISOString(),
     algorithmId: s.algorithmId, params: algo ? resolveParams(algo, s.params[s.algorithmId] ?? {}) : {}, seed: s.seed,
     paper: s.paper, profile: s.profile, penWidth: s.penWidth, strokeColor: s.strokeColor, paperColor: s.paperColor,
-    optimize: s.optimize, clip: s.clip,
+    optimize: s.optimize, clip: s.clip, plotLayers: s.plotLayers ?? sanitizePlotLayers(undefined),
   };
   if (includeImages && algo?.inputs && (images.photo || images.depth)) {
     p.images = {};
@@ -113,7 +117,7 @@ export function parseProject(text: string): { project: ProjectFile } | { error: 
     seed: Math.min(999_999, Math.max(1, Math.round(finite(raw.seed, 1)))), paper,
     profile: merge(DEFAULT_PROFILE, raw.profile), penWidth: Math.min(2, Math.max(0.05, finite(raw.penWidth, 0.3))),
     strokeColor: color(raw.strokeColor, "#000000"), paperColor: color(raw.paperColor, "#ffffff"),
-    optimize: merge(DEFAULT_OPTIMIZE, raw.optimize), clip: merge(DEFAULT_CLIP, raw.clip),
+    optimize: merge(DEFAULT_OPTIMIZE, raw.optimize), clip: merge(DEFAULT_CLIP, raw.clip), plotLayers: sanitizePlotLayers(raw.plotLayers),
   };
   if (isObj(raw.images)) {
     project.images = {};

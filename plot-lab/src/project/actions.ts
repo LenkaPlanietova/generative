@@ -37,7 +37,7 @@ export function applyProject(p: ProjectFile): void {
   useSettings.setState({
     projectName: p.name, algorithmId: p.algorithmId, params: { ...s.params, [p.algorithmId]: p.params }, seed: p.seed,
     seedHistory: [], paper: p.paper, profile: p.profile, penWidth: p.penWidth, strokeColor: p.strokeColor, paperColor: p.paperColor,
-    optimize: p.optimize, clip: p.clip,
+    optimize: p.optimize, clip: p.clip, ...(p.plotLayers ? { plotLayers: p.plotLayers } : {}),
   });
   useImages.setState({
     photo: p.images?.photo ? unembedImage(p.images.photo) : undefined,

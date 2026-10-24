@@ -13,6 +13,8 @@ export interface PlotPath {
   points: Point[];
   closed: boolean;
   layerId: string;
+  /** Plot Layers priming stroke: drawn in the priming strip (in the margin), not part of the artwork. */
+  prime?: boolean;
 }
 
 export interface Layer {

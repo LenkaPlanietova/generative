@@ -6,6 +6,7 @@ import { DEFAULT_PAPER, type PaperSettings } from "../core/paper";
 import { type ClipSettings, DEFAULT_CLIP } from "../geometry/clipShape";
 import { DEFAULT_MAX_POINTS } from "../pipeline";
 import { DEFAULT_OPTIMIZE, type OptimizeOptions } from "../plotter/optimize";
+import { DEFAULT_PLOT_LAYERS, type PlotLayerSettings, type PrimeSettings, sanitizePlotLayers } from "../plotter/plotLayers";
 import { DEFAULT_PROFILE, type PlotterProfile } from "../plotter/profiles";
 
 export interface ViewOptions { grid: boolean; margins: boolean; pathViz: boolean; reference: boolean }
@@ -27,6 +28,7 @@ export interface SettingsState {
   auto: boolean;
   projectName: string;
   clip: ClipSettings;
+  plotLayers: PlotLayerSettings;
   /** Safety limit: maximum points in one drawing. */
   maxPoints: number;
 
@@ -46,11 +48,15 @@ export interface SettingsState {
   setView(p: Partial<ViewOptions>): void;
   setAuto(auto: boolean): void;
   setClip(p: Partial<ClipSettings>): void;
+  setPlotLayers(p: Partial<Omit<PlotLayerSettings, "prime">> & { prime?: Partial<PrimeSettings> }): void;
   setProjectName(name: string): void;
   setMaxPoints(n: number): void;
   /** Replace the parameters of one algorithm (presets, variations, projects). */
   setParams(algorithmId: string, params: ParamValues): void;
-  /** Start over: defaults for every algorithm, a fresh seed, no clip. Machine settings (profile, pen) are kept. */
+  /**
+   * Start over: defaults for every algorithm, a fresh seed, no clip, no mask. Machine settings (profile, pen, the
+   * marker's ink per pump and the priming strip) are kept.
+   */
   newProject(): void;
 }
 
@@ -83,6 +89,7 @@ export const useSettings = create<SettingsState>()(
         auto: true,
         projectName: "Untitled",
         clip: DEFAULT_CLIP,
+        plotLayers: DEFAULT_PLOT_LAYERS,
         maxPoints: DEFAULT_MAX_POINTS,
 
         setAlgorithm: (id) => { if (getAlgorithm(id)) set({ algorithmId: id }); },
@@ -108,6 +115,7 @@ export const useSettings = create<SettingsState>()(
         setView: (p) => set((s) => ({ view: { ...s.view, ...p } })),
         setAuto: (auto) => set({ auto }),
         setClip: (p) => set((s) => ({ clip: { ...s.clip, ...p } })),
+        setPlotLayers: (p) => set((s) => ({ plotLayers: sanitizePlotLayers({ ...s.plotLayers, ...p, prime: { ...s.plotLayers.prime, ...p.prime } }) })),
         setMaxPoints: (maxPoints) => set({ maxPoints: Math.max(10_000, Math.round(maxPoints)) }),
         setProjectName: (projectName) => set({ projectName: projectName.slice(0, 120) }),
         setParams: (algorithmId, params) => {
@@ -117,7 +125,8 @@ export const useSettings = create<SettingsState>()(
         newProject: () => set((s) => ({
           algorithmId: ALGORITHMS[0].id,
           params: Object.fromEntries(ALGORITHMS.map((a) => [a.id, defaultParams(a)])),
-          seed: freshSeed(), seedHistory: [], seedLocked: false, clip: DEFAULT_CLIP, projectName: "Untitled", paper: { ...DEFAULT_PAPER, ...{ paper: s.paper.paper, orientation: s.paper.orientation } },
+          seed: freshSeed(), seedHistory: [], seedLocked: false, clip: DEFAULT_CLIP, projectName: "Untitled",
+          plotLayers: { ...DEFAULT_PLOT_LAYERS, inkPerPumpMm: s.plotLayers.inkPerPumpMm, inkSafety: s.plotLayers.inkSafety, prime: s.plotLayers.prime }, paper: { ...DEFAULT_PAPER, ...{ paper: s.paper.paper, orientation: s.paper.orientation } },
         })),
       };
     },
@@ -134,12 +143,13 @@ export const useSettings = create<SettingsState>()(
         s.optimize = { ...DEFAULT_OPTIMIZE, ...s.optimize };
         s.view = { ...current.view, ...s.view };
         s.clip = { ...DEFAULT_CLIP, ...s.clip };
+        s.plotLayers = sanitizePlotLayers(s.plotLayers);
         return s;
       },
       partialize: (s) => ({
         algorithmId: s.algorithmId, params: s.params, seed: s.seed, seedLocked: s.seedLocked, seedHistory: s.seedHistory,
         paper: s.paper, profile: s.profile, penWidth: s.penWidth, strokeColor: s.strokeColor, paperColor: s.paperColor,
-        optimize: s.optimize, view: s.view, auto: s.auto, projectName: s.projectName, clip: s.clip, maxPoints: s.maxPoints,
+        optimize: s.optimize, view: s.view, auto: s.auto, projectName: s.projectName, clip: s.clip, plotLayers: s.plotLayers, maxPoints: s.maxPoints,
       }),
     },
   ),
